@@ -26,3 +26,26 @@ DRIVER_CONFIG = {
     # Proxy: Servidor proxy en formato "ip:puerto"
     "proxy": None  # Ejemplo: "123.45.67.89:8080"
 }
+
+# ============================================
+# CONFIGURACIÓN DE OUTPUT
+# ============================================
+
+OUTPUT_CONFIG = {
+    # Formato de salida: "csv", "json", "xml"
+    "format": "csv",
+
+    # Nombre del archivo (sin extensión, se agrega automáticamente)
+    "filename": "viviendas",
+
+    # Opciones específicas por formato:
+    # CSV: encoding para caracteres especiales
+    "csv_encoding": "utf-8-sig",
+
+    # JSON: indent para formato legible (None para compacto)
+    "json_indent": 2,
+
+    # XML: nombre del elemento raíz y de cada registro
+    "xml_root": "registros",
+    "xml_row": "registro"
+}
