@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2026-01-24
+
+### Added
+- Archivo `web_config.yaml` para configuracion de la web a scrapear
+- Funcion `load_web_config()` en `main.py` para cargar configuracion YAML
+- Dependencia de `pyyaml` para parsing de archivos YAML
+
+### Changed
+- `scrape()` ahora recibe `web_config` en lugar de `url`, usa selectores del YAML
+- Selectores XPath externalizados a `web_config.yaml` (url, xpath_selectors, waits)
+- La extraccion de campos es dinamica: itera sobre los selectores definidos en el YAML
+
 ## [0.2.0] - 2026-01-24
 
 ### Added

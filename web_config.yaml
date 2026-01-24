@@ -1,0 +1,12 @@
+url: "https://www.adondevivir.com/inmuebles-en-alquiler.html"
+
+xpath_selectors:
+  container: '//div[@class="postingCard-module__posting-container"]'
+  Precio: './/div[@class="postingPrices-module__price"]'
+  Direccion: './/span[@class="postingLocations-module__location-address postingLocations-module__location-address-in-listing"]'
+  Caracteristicas: './/h3'
+  Descripcion: './/div[@data-qa="POSTING_CARD_DESCRIPTION"]'
+
+waits:
+  reconnect_attempts: 3
+  after_load: 5
