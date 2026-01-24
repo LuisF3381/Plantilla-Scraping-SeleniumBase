@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0] - 2026-01-24
+
+### Added
+- Archivo `requirements.txt` con dependencias del proyecto
+- Clase `TestWebConfig` en `test_driver_config.py` con validaciones:
+  - `test_web_config_file_exists`: Verifica existencia del YAML
+  - `test_web_config_has_required_keys`: Valida claves requeridas
+  - `test_url_format_is_valid`: Valida formato de URL (http/https + dominio)
+  - `test_xpath_selectors_format`: Valida formato XPath (/, // o .//)
+  - `test_waits_are_positive_numbers`: Valida que waits sean numeros positivos
+
 ## [0.3.0] - 2026-01-24
 
 ### Added
