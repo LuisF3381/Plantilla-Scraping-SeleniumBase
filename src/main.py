@@ -2,11 +2,11 @@ from selenium.webdriver.common.by import By
 import time
 import pandas as pd
 import yaml
-from driver_config import DriverConfig
-import config
+from src.driver_config import DriverConfig
+from config import settings
 
 
-def load_web_config(path="web_config.yaml"):
+def load_web_config(path="config/web_config.yaml"):
     """Carga la configuracion de la web desde el archivo YAML."""
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -25,15 +25,15 @@ def save_data(datos, output_config):
     filename = output_config["filename"]
 
     if fmt == "csv":
-        filepath = f"{filename}.csv"
+        filepath = f"output/{filename}.csv"
         df.to_csv(filepath, index=False, encoding=output_config["csv_encoding"])
 
     elif fmt == "json":
-        filepath = f"{filename}.json"
+        filepath = f"output/{filename}.json"
         df.to_json(filepath, orient="records", indent=output_config["json_indent"], force_ascii=False)
 
     elif fmt == "xml":
-        filepath = f"{filename}.xml"
+        filepath = f"output/{filename}.xml"
         df.to_xml(filepath, index=False, root_name=output_config["xml_root"], row_name=output_config["xml_row"])
 
     else:
@@ -79,12 +79,12 @@ def scrape(driver, web_config):
 
 def main():
     web_config = load_web_config()
-    driver_config = DriverConfig(**config.DRIVER_CONFIG)
+    driver_config = DriverConfig(**settings.DRIVER_CONFIG)
     driver = driver_config.get_driver()
 
     try:
         datos = scrape(driver, web_config)
-        save_data(datos, config.OUTPUT_CONFIG)
+        save_data(datos, settings.OUTPUT_CONFIG)
     finally:
         driver.quit()
 

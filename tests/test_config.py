@@ -2,9 +2,9 @@ import pytest
 import os
 import re
 from urllib.parse import urlparse
-from driver_config import DriverConfig
-from main import load_web_config
-import config
+from src.driver_config import DriverConfig
+from src.main import load_web_config
+from config import settings
 
 
 class TestWebConfig:
@@ -12,8 +12,8 @@ class TestWebConfig:
 
     def test_web_config_file_exists(self):
         """Verifica que existe el archivo web_config.yaml."""
-        assert os.path.exists("web_config.yaml"), "No existe web_config.yaml"
-        print("✓ web_config.yaml existe")
+        assert os.path.exists("config/web_config.yaml"), "No existe config/web_config.yaml"
+        print("✓ config/web_config.yaml existe")
 
     def test_web_config_has_required_keys(self):
         """Verifica que el YAML tiene las claves requeridas."""
@@ -55,21 +55,21 @@ class TestWebConfig:
 
 
 class TestDriverConfig:
-    """Tests para verificar que el driver se inicializa correctamente con config.py"""
+    """Tests para verificar que el driver se inicializa correctamente con settings.py"""
 
-    def test_config_file_has_driver_config(self):
-        """Verifica que config.py tiene la configuración DRIVER_CONFIG."""
-        assert hasattr(config, 'DRIVER_CONFIG')
-        assert isinstance(config.DRIVER_CONFIG, dict)
-        print("✓ config.py contiene DRIVER_CONFIG")
+    def test_settings_file_has_driver_config(self):
+        """Verifica que settings.py tiene la configuración DRIVER_CONFIG."""
+        assert hasattr(settings, 'DRIVER_CONFIG')
+        assert isinstance(settings.DRIVER_CONFIG, dict)
+        print("✓ settings.py contiene DRIVER_CONFIG")
 
-    def test_driver_instance_created_with_config_file(self):
+    def test_driver_instance_created_with_settings_file(self):
         """
         TEST PRINCIPAL: Verifica que se puede crear una instancia del driver
-        con la configuración exacta de config.py
+        con la configuración exacta de settings.py
         """
         # Modificar temporalmente para modo headless (más rápido en tests)
-        test_config = config.DRIVER_CONFIG.copy()
+        test_config = settings.DRIVER_CONFIG.copy()
         test_config['headless'] = True
 
         driver_config = DriverConfig(**test_config)
@@ -77,7 +77,7 @@ class TestDriverConfig:
 
         try:
             assert driver is not None
-            print("✓ Driver inicializado correctamente con configuración de config.py")
+            print("✓ Driver inicializado correctamente con configuración de settings.py")
         finally:
             driver.quit()
 

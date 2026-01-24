@@ -11,7 +11,8 @@ env/
 .venv/
 
 # Archivos generados
-*.csv
+output/*
+!output/.gitkeep
 downloaded_files/
 
 # IDE

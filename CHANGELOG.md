@@ -1,10 +1,29 @@
 # Changelog
 
+## [0.5.0] - 2026-01-24
+
+### Added
+- Carpeta `src/` para codigo fuente
+- Carpeta `config/` para archivos de configuracion
+- Carpeta `tests/` para tests
+- Carpeta `output/` para archivos generados
+- Archivos `__init__.py` en cada paquete
+- Archivo `.gitkeep` en `output/`
+
+### Changed
+- Reorganizacion del proyecto siguiendo estandar Python (src layout)
+- `config.py` renombrado a `config/settings.py`
+- `web_config.yaml` movido a `config/`
+- `main.py` y `driver_config.py` movidos a `src/`
+- `test_driver_config.py` movido a `tests/test_config.py`
+- Archivos de salida ahora se guardan en `output/`
+- Actualizados imports en todos los modulos
+
 ## [0.4.0] - 2026-01-24
 
 ### Added
 - Archivo `requirements.txt` con dependencias del proyecto
-- Clase `TestWebConfig` en `test_driver_config.py` con validaciones:
+- Clase `TestWebConfig` con validaciones:
   - `test_web_config_file_exists`: Verifica existencia del YAML
   - `test_web_config_has_required_keys`: Valida claves requeridas
   - `test_url_format_is_valid`: Valida formato de URL (http/https + dominio)
