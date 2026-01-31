@@ -54,6 +54,60 @@ class TestWebConfig:
         print("✓ Waits tienen valores válidos")
 
 
+class TestDataConfig:
+    """Tests para validar DATA_CONFIG en settings.py"""
+
+    def test_settings_has_data_config(self):
+        """Verifica que settings.py tiene DATA_CONFIG."""
+        assert hasattr(settings, 'DATA_CONFIG')
+        assert isinstance(settings.DATA_CONFIG, dict)
+        print("✓ settings.py contiene DATA_CONFIG")
+
+    def test_data_config_has_required_keys(self):
+        """Verifica que DATA_CONFIG tiene las claves requeridas."""
+        required_keys = ["format", "csv_encoding", "json_indent", "xml_root", "xml_row"]
+        for key in required_keys:
+            assert key in settings.DATA_CONFIG, f"Falta '{key}' en DATA_CONFIG"
+        print("✓ DATA_CONFIG tiene todas las claves requeridas")
+
+    def test_data_config_format_is_valid(self):
+        """Verifica que el formato es válido."""
+        valid_formats = ["csv", "json", "xml"]
+        fmt = settings.DATA_CONFIG["format"]
+        assert fmt in valid_formats, f"Formato inválido: {fmt}. Debe ser uno de {valid_formats}"
+        print(f"✓ Formato válido: {fmt}")
+
+
+class TestStorageConfig:
+    """Tests para validar STORAGE_CONFIG en settings.py"""
+
+    def test_settings_has_storage_config(self):
+        """Verifica que settings.py tiene STORAGE_CONFIG."""
+        assert hasattr(settings, 'STORAGE_CONFIG')
+        assert isinstance(settings.STORAGE_CONFIG, dict)
+        print("✓ settings.py contiene STORAGE_CONFIG")
+
+    def test_storage_config_has_required_keys(self):
+        """Verifica que STORAGE_CONFIG tiene las claves requeridas."""
+        required_keys = ["output_folder", "filename", "naming_mode"]
+        for key in required_keys:
+            assert key in settings.STORAGE_CONFIG, f"Falta '{key}' en STORAGE_CONFIG"
+        print("✓ STORAGE_CONFIG tiene todas las claves requeridas")
+
+    def test_storage_config_naming_mode_is_valid(self):
+        """Verifica que naming_mode es válido."""
+        valid_modes = ["overwrite", "date_suffix", "timestamp_suffix", "date_folder"]
+        mode = settings.STORAGE_CONFIG["naming_mode"]
+        assert mode in valid_modes, f"Modo inválido: {mode}. Debe ser uno de {valid_modes}"
+        print(f"✓ Modo de nombrado válido: {mode}")
+
+    def test_storage_config_output_folder_exists(self):
+        """Verifica que la carpeta de salida existe."""
+        folder = settings.STORAGE_CONFIG["output_folder"]
+        assert os.path.isdir(folder), f"Carpeta de salida no existe: {folder}"
+        print(f"✓ Carpeta de salida existe: {folder}")
+
+
 class TestDriverConfig:
     """Tests para verificar que el driver se inicializa correctamente con settings.py"""
 

@@ -1,5 +1,7 @@
 from selenium.webdriver.common.by import By
 import time
+import os
+from datetime import datetime
 import pandas as pd
 import yaml
 from src.driver_config import DriverConfig
@@ -12,34 +14,72 @@ def load_web_config(path="config/web_config.yaml"):
         return yaml.safe_load(f)
 
 
-def save_data(datos, output_config):
+def build_filepath(storage_config, data_config):
     """
-    Guarda los datos en el formato especificado.
+    Construye la ruta del archivo según el modo de nombrado configurado.
+
+    Args:
+        storage_config: Diccionario con configuración de almacenamiento
+        data_config: Diccionario con configuración de datos (para obtener extensión)
+
+    Returns:
+        str: Ruta completa del archivo a guardar
+    """
+    output_folder = storage_config["output_folder"]
+    filename = storage_config["filename"]
+    naming_mode = storage_config["naming_mode"]
+    extension = data_config["format"]
+
+    now = datetime.now()
+    date_str = now.strftime("%Y%m%d")
+    timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+
+    if naming_mode == "overwrite":
+        filepath = os.path.join(output_folder, f"{filename}.{extension}")
+
+    elif naming_mode == "date_suffix":
+        filepath = os.path.join(output_folder, f"{filename}_{date_str}.{extension}")
+
+    elif naming_mode == "timestamp_suffix":
+        filepath = os.path.join(output_folder, f"{filename}_{timestamp_str}.{extension}")
+
+    elif naming_mode == "date_folder":
+        folder_path = os.path.join(output_folder, date_str)
+        os.makedirs(folder_path, exist_ok=True)
+        filepath = os.path.join(folder_path, f"{filename}.{extension}")
+
+    else:
+        raise ValueError(f"Modo de nombrado no soportado: {naming_mode}")
+
+    return filepath
+
+
+def save_data(datos, data_config, storage_config):
+    """
+    Guarda los datos en el formato y ubicación especificados.
 
     Args:
         datos: Lista de diccionarios con los datos a guardar
-        output_config: Diccionario con la configuración de output
+        data_config: Diccionario con configuración del formato de datos
+        storage_config: Diccionario con configuración de almacenamiento
     """
     df = pd.DataFrame(datos)
-    fmt = output_config["format"]
-    filename = output_config["filename"]
+    fmt = data_config["format"]
+    filepath = build_filepath(storage_config, data_config)
 
     if fmt == "csv":
-        filepath = f"output/{filename}.csv"
-        df.to_csv(filepath, index=False, encoding=output_config["csv_encoding"])
+        df.to_csv(filepath, index=False, encoding=data_config["csv_encoding"])
 
     elif fmt == "json":
-        filepath = f"output/{filename}.json"
-        df.to_json(filepath, orient="records", indent=output_config["json_indent"], force_ascii=False)
+        df.to_json(filepath, orient="records", indent=data_config["json_indent"], force_ascii=False)
 
     elif fmt == "xml":
-        filepath = f"output/{filename}.xml"
-        df.to_xml(filepath, index=False, root_name=output_config["xml_root"], row_name=output_config["xml_row"])
+        df.to_xml(filepath, index=False, root_name=data_config["xml_root"], row_name=data_config["xml_row"])
 
     else:
         raise ValueError(f"Formato no soportado: {fmt}")
 
-    print(f"✓ Datos guardados en {filepath} ({len(datos)} registros)")
+    print(f"Datos guardados en {filepath} ({len(datos)} registros)")
 
 
 def scrape(driver, web_config):
@@ -84,7 +124,7 @@ def main():
 
     try:
         datos = scrape(driver, web_config)
-        save_data(datos, settings.OUTPUT_CONFIG)
+        save_data(datos, settings.DATA_CONFIG, settings.STORAGE_CONFIG)
     finally:
         driver.quit()
 

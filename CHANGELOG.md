@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0] - 2026-01-30
+
+### Added
+- Nueva configuracion `DATA_CONFIG` para formato de datos (csv_encoding, json_indent, xml_root, xml_row)
+- Nueva configuracion `STORAGE_CONFIG` para almacenamiento (output_folder, filename, naming_mode)
+- Funcion `build_filepath()` en `main.py` para construir rutas segun modo de nombrado
+- Soporte para 4 modos de nombrado de archivos:
+  - `overwrite`: Sobrescribe el archivo existente (viviendas.csv)
+  - `date_suffix`: Añade fecha al nombre (viviendas_20260130.csv)
+  - `timestamp_suffix`: Añade fecha y hora (viviendas_20260130_143052.csv)
+  - `date_folder`: Crea subcarpeta con fecha (20260130/viviendas.csv)
+
+### Changed
+- `OUTPUT_CONFIG` separado en `DATA_CONFIG` y `STORAGE_CONFIG` para mejor organizacion
+- Funcion `save_data()` ahora recibe `data_config` y `storage_config` como argumentos separados
+- Carpeta de salida ahora es configurable via `STORAGE_CONFIG["output_folder"]`
+
+### Removed
+- `OUTPUT_CONFIG` reemplazado por las nuevas configuraciones separadas
+
+### Tests
+- Clase `TestDataConfig` con 3 tests para validar DATA_CONFIG
+- Clase `TestStorageConfig` con 4 tests para validar STORAGE_CONFIG
+- Total de tests: 14 (antes 7)
+
 ## [0.5.0] - 2026-01-24
 
 ### Added

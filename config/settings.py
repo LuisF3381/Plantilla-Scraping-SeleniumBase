@@ -28,15 +28,12 @@ DRIVER_CONFIG = {
 }
 
 # ============================================
-# CONFIGURACIÓN DE OUTPUT
+# CONFIGURACIÓN DE DATOS (formato de la broad)
 # ============================================
 
-OUTPUT_CONFIG = {
+DATA_CONFIG = {
     # Formato de salida: "csv", "json", "xml"
     "format": "csv",
-
-    # Nombre del archivo (sin extensión, se agrega automáticamente)
-    "filename": "viviendas",
 
     # Opciones específicas por formato:
     # CSV: encoding para caracteres especiales
@@ -48,4 +45,23 @@ OUTPUT_CONFIG = {
     # XML: nombre del elemento raíz y de cada registro
     "xml_root": "registros",
     "xml_row": "registro"
+}
+
+# ============================================
+# CONFIGURACIÓN DE ALMACENAMIENTO
+# ============================================
+
+STORAGE_CONFIG = {
+    # Carpeta de salida (relativa a la raíz del proyecto)
+    "output_folder": "output",
+
+    # Nombre base del archivo (sin extensión)
+    "filename": "viviendas",
+
+    # Modo de nombrado del archivo:
+    # - "overwrite": Sobrescribe el archivo (viviendas.csv)
+    # - "date_suffix": Añade fecha al nombre (viviendas_20260130.csv)
+    # - "timestamp_suffix": Añade fecha y hora (viviendas_20260130_143052.csv)
+    # - "date_folder": Crea subcarpeta con fecha (20260130/viviendas.csv)
+    "naming_mode": "date_suffix"
 }
