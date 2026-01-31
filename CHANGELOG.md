@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0] - 2026-01-30
+
+### Changed
+- `DATA_CONFIG` reestructurado como diccionario anidado con configuraciones independientes por formato
+- Cada formato (csv, json, xml, xlsx) tiene su propia configuracion separada
+- Funcion `save_data()` ahora recibe `format` como parametro independiente
+- Funcion `build_filepath()` ahora recibe `format` como parametro en lugar de `data_config`
+
+### Added
+- Soporte para formato Excel (`xlsx`) con opciones `sheet_name` e `index`
+- Nuevas opciones para CSV: `separator`, `index`
+- Nuevas opciones para JSON: `orient`, `force_ascii`
+
+### Tests
+- Simplificado `TestDataConfig` a un solo test que valida existencia y al menos un formato
+- Total de tests: 12 (antes 14)
+
+### Removed
+- Campo `format` de nivel superior en DATA_CONFIG (ahora el formato se pasa como parametro)
+
 ## [0.6.0] - 2026-01-30
 
 ### Added

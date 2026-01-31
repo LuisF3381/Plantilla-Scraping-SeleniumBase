@@ -28,23 +28,35 @@ DRIVER_CONFIG = {
 }
 
 # ============================================
-# CONFIGURACIÓN DE DATOS (formato de la broad)
+# CONFIGURACIÓN DE DATOS (formatos de exportación)
 # ============================================
 
 DATA_CONFIG = {
-    # Formato de salida: "csv", "json", "xml"
-    "format": "csv",
+    # Configuración para CSV
+    "csv": {
+        "encoding": "utf-8",
+        "separator": ";",
+        "index": False
+    },
 
-    # Opciones específicas por formato:
-    # CSV: encoding para caracteres especiales
-    "csv_encoding": "utf-8-sig",
+    # Configuración para JSON
+    "json": {
+        "indent": 2,
+        "force_ascii": False,
+        "orient": "records"
+    },
 
-    # JSON: indent para formato legible (None para compacto)
-    "json_indent": 2,
+    # Configuración para XML
+    "xml": {
+        "root": "registros",
+        "row": "registro"
+    },
 
-    # XML: nombre del elemento raíz y de cada registro
-    "xml_root": "registros",
-    "xml_row": "registro"
+    # Configuración para Excel
+    "xlsx": {
+        "sheet_name": "Datos",
+        "index": False
+    }
 }
 
 # ============================================

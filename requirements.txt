@@ -2,3 +2,4 @@ seleniumbase
 pandas
 pyyaml
 pytest
+openpyxl

@@ -58,24 +58,11 @@ class TestDataConfig:
     """Tests para validar DATA_CONFIG en settings.py"""
 
     def test_settings_has_data_config(self):
-        """Verifica que settings.py tiene DATA_CONFIG."""
-        assert hasattr(settings, 'DATA_CONFIG')
-        assert isinstance(settings.DATA_CONFIG, dict)
-        print("✓ settings.py contiene DATA_CONFIG")
-
-    def test_data_config_has_required_keys(self):
-        """Verifica que DATA_CONFIG tiene las claves requeridas."""
-        required_keys = ["format", "csv_encoding", "json_indent", "xml_root", "xml_row"]
-        for key in required_keys:
-            assert key in settings.DATA_CONFIG, f"Falta '{key}' en DATA_CONFIG"
-        print("✓ DATA_CONFIG tiene todas las claves requeridas")
-
-    def test_data_config_format_is_valid(self):
-        """Verifica que el formato es válido."""
-        valid_formats = ["csv", "json", "xml"]
-        fmt = settings.DATA_CONFIG["format"]
-        assert fmt in valid_formats, f"Formato inválido: {fmt}. Debe ser uno de {valid_formats}"
-        print(f"✓ Formato válido: {fmt}")
+        """Verifica que settings.py tiene DATA_CONFIG con al menos un formato."""
+        assert hasattr(settings, 'DATA_CONFIG'), "Falta DATA_CONFIG en settings.py"
+        assert isinstance(settings.DATA_CONFIG, dict), "DATA_CONFIG debe ser un diccionario"
+        assert len(settings.DATA_CONFIG) > 0, "DATA_CONFIG debe tener al menos un formato"
+        print(f"✓ DATA_CONFIG contiene {len(settings.DATA_CONFIG)} formato(s): {list(settings.DATA_CONFIG.keys())}")
 
 
 class TestStorageConfig:

@@ -14,13 +14,13 @@ def load_web_config(path="config/web_config.yaml"):
         return yaml.safe_load(f)
 
 
-def build_filepath(storage_config, data_config):
+def build_filepath(storage_config, format):
     """
     Construye la ruta del archivo según el modo de nombrado configurado.
 
     Args:
         storage_config: Diccionario con configuración de almacenamiento
-        data_config: Diccionario con configuración de datos (para obtener extensión)
+        format: Formato de salida (csv, json, xml, xlsx)
 
     Returns:
         str: Ruta completa del archivo a guardar
@@ -28,7 +28,7 @@ def build_filepath(storage_config, data_config):
     output_folder = storage_config["output_folder"]
     filename = storage_config["filename"]
     naming_mode = storage_config["naming_mode"]
-    extension = data_config["format"]
+    extension = format
 
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
@@ -54,30 +54,56 @@ def build_filepath(storage_config, data_config):
     return filepath
 
 
-def save_data(datos, data_config, storage_config):
+def save_data(datos, format, data_config, storage_config):
     """
     Guarda los datos en el formato y ubicación especificados.
 
     Args:
         datos: Lista de diccionarios con los datos a guardar
-        data_config: Diccionario con configuración del formato de datos
+        format: Formato de salida (csv, json, xml, xlsx)
+        data_config: Diccionario con configuraciones de cada formato
         storage_config: Diccionario con configuración de almacenamiento
     """
+    if format not in data_config:
+        raise ValueError(f"Formato no soportado: {format}. Disponibles: {list(data_config.keys())}")
+
     df = pd.DataFrame(datos)
-    fmt = data_config["format"]
-    filepath = build_filepath(storage_config, data_config)
+    config = data_config[format]
+    filepath = build_filepath(storage_config, format)
 
-    if fmt == "csv":
-        df.to_csv(filepath, index=False, encoding=data_config["csv_encoding"])
+    if format == "csv":
+        df.to_csv(
+            filepath,
+            index=config.get("index", False),
+            encoding=config.get("encoding", "utf-8"),
+            sep=config.get("separator", ",")
+        )
 
-    elif fmt == "json":
-        df.to_json(filepath, orient="records", indent=data_config["json_indent"], force_ascii=False)
+    elif format == "json":
+        df.to_json(
+            filepath,
+            orient=config.get("orient", "records"),
+            indent=config.get("indent", 2),
+            force_ascii=config.get("force_ascii", False)
+        )
 
-    elif fmt == "xml":
-        df.to_xml(filepath, index=False, root_name=data_config["xml_root"], row_name=data_config["xml_row"])
+    elif format == "xml":
+        df.to_xml(
+            filepath,
+            index=False,
+            root_name=config.get("root", "registros"),
+            row_name=config.get("row", "registro")
+        )
+
+    elif format == "xlsx":
+        df.to_excel(
+            filepath,
+            index=config.get("index", False),
+            sheet_name=config.get("sheet_name", "Datos")
+        )
 
     else:
-        raise ValueError(f"Formato no soportado: {fmt}")
+        raise ValueError(f"Formato no soportado: {format}")
 
     print(f"Datos guardados en {filepath} ({len(datos)} registros)")
 
@@ -111,7 +137,9 @@ def scrape(driver, web_config):
         for field_name, field_xpath in selectors.items():
             if field_name == "container":
                 continue
-            registro[field_name] = item.find_element(By.XPATH, field_xpath).text
+            text = item.find_element(By.XPATH, field_xpath).text
+            # Limpiar saltos de línea para evitar problemas en CSV
+            registro[field_name] = text.replace("\n", " | ").strip()
         datos.append(registro)
 
     return datos
@@ -124,7 +152,7 @@ def main():
 
     try:
         datos = scrape(driver, web_config)
-        save_data(datos, settings.DATA_CONFIG, settings.STORAGE_CONFIG)
+        save_data(datos, "csv", settings.DATA_CONFIG, settings.STORAGE_CONFIG)
     finally:
         driver.quit()
 

@@ -41,16 +41,40 @@ DRIVER_CONFIG = {
 
 ### Datos (`config/settings.py`)
 
-Configura el formato de los datos exportados:
+Configuraciones independientes para cada formato de exportacion:
 
 ```python
 DATA_CONFIG = {
-    "format": "csv",            # Formato: "csv", "json", "xml"
-    "csv_encoding": "utf-8-sig",
-    "json_indent": 2,
-    "xml_root": "registros",
-    "xml_row": "registro"
+    "csv": {
+        "encoding": "utf-8-sig",
+        "separator": ",",
+        "index": False
+    },
+    "json": {
+        "indent": 2,
+        "force_ascii": False,
+        "orient": "records"
+    },
+    "xml": {
+        "root": "registros",
+        "row": "registro"
+    },
+    "xlsx": {
+        "sheet_name": "Datos",
+        "index": False
+    }
 }
+```
+
+Uso en codigo:
+
+```python
+# Exportar a un formato
+save_data(datos, "csv", settings.DATA_CONFIG, settings.STORAGE_CONFIG)
+
+# Exportar a multiples formatos
+for formato in ["csv", "json", "xlsx"]:
+    save_data(datos, formato, settings.DATA_CONFIG, settings.STORAGE_CONFIG)
 ```
 
 ### Almacenamiento (`config/settings.py`)
@@ -113,9 +137,7 @@ pytest tests/ -v
 ### DataConfig
 | Test | Descripcion |
 |------|-------------|
-| `test_settings_has_data_config` | Verifica DATA_CONFIG existe |
-| `test_data_config_has_required_keys` | Valida claves requeridas |
-| `test_data_config_format_is_valid` | Valida formato (csv/json/xml) |
+| `test_settings_has_data_config` | Verifica DATA_CONFIG existe y tiene al menos un formato |
 
 ### StorageConfig
 | Test | Descripcion |
