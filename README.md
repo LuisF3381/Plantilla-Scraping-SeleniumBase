@@ -1,26 +1,38 @@
-# Plantilla Scraping SeleniumBase
+# ScrapeCraft
 
-Plantilla para proyectos de web scraping usando SeleniumBase con soporte para evasion de deteccion.
+Plantilla open source para construir web scrapers de forma facil y rapida. Basada en [SeleniumBase](https://github.com/seleniumbase/SeleniumBase), un framework de automatizacion con soporte integrado para evasion de deteccion.
+
+## Proposito
+
+ScrapeCraft busca ser un punto de partida para cualquier persona que quiera aprender web scraping o construir sus propios scrapers para **fines educativos y divertidos**. La plantilla esta disenada para ser:
+
+- **Facil de usar**: Configura tu scraper editando archivos YAML y Python, sin tocar el codigo principal
+- **Flexible**: Soporta multiples formatos de salida (CSV, JSON, XML, Excel)
+- **Robusta**: Incluye sistema de logging, manejo de errores y evasion de deteccion
 
 ## Estructura
 
 ```
 ├── src/                      # Codigo fuente
 │   ├── main.py               # Script principal
-│   └── driver_config.py      # Configuracion del driver
+│   ├── driver_config.py      # Configuracion del driver
+│   └── logger.py             # Sistema de logging
 ├── config/                   # Configuraciones
-│   ├── settings.py           # Config del driver y output
+│   ├── settings.py           # Config del driver, datos y logging
 │   └── web_config.yaml       # URL, selectores y waits
-├── tests/                    # Tests
-│   └── test_config.py
+├── log/                      # Logs de ejecucion
 ├── output/                   # Archivos generados
+├── tests/                    # Tests
 ├── requirements.txt
-└── CHANGELOG.md
+├── CHANGELOG.md
+└── LICENSE
 ```
 
 ## Instalacion
 
 ```bash
+git clone https://github.com/tu-usuario/ScrapeCraft.git
+cd ScrapeCraft
 pip install -r requirements.txt
 ```
 
@@ -38,6 +50,17 @@ DRIVER_CONFIG = {
     "proxy": None           # Proxy: "ip:puerto"
 }
 ```
+
+### Logging (`config/settings.py`)
+
+```python
+LOG_CONFIG = {
+    "log_folder": "log",    # Carpeta de logs
+    "level": "INFO"         # Nivel: DEBUG, INFO, WARNING, ERROR
+}
+```
+
+Los logs se guardan en `log/scrapecraft_YYYYMMDD.log` y tambien se muestran en consola.
 
 ### Datos (`config/settings.py`)
 
@@ -160,3 +183,18 @@ pytest tests/ -v
 - pandas
 - pyyaml
 - pytest
+
+## Licencia
+
+Este proyecto es open source y esta disponible bajo la [Licencia MIT](LICENSE).
+
+## Aviso Legal
+
+Esta plantilla esta destinada exclusivamente para fines educativos y de aprendizaje. Antes de realizar scraping en cualquier sitio web, asegurate de:
+
+- Revisar y respetar los terminos de servicio del sitio
+- Consultar el archivo `robots.txt`
+- No sobrecargar los servidores con peticiones excesivas
+- Respetar la privacidad y los datos personales
+
+El uso responsable del web scraping es responsabilidad del usuario.

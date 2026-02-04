@@ -1,6 +1,18 @@
 """
-Archivo de configuración para el proyecto de scraping.
+Archivo de configuracion para ScrapeCraft.
 """
+
+# ============================================
+# CONFIGURACIÓN DE LOGGING
+# ============================================
+
+LOG_CONFIG = {
+    # Carpeta donde se guardan los logs
+    "log_folder": "log",
+
+    # Nivel de logging: DEBUG, INFO, WARNING, ERROR
+    "level": "INFO"
+}
 
 # ============================================
 # CONFIGURACIÓN DEL DRIVER

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.8.0] - 2026-02-03
+
+### Added
+- Sistema de logging con salida dual (archivo + consola)
+- Modulo `src/logger.py` con funcion `setup_logger()`
+- Configuracion `LOG_CONFIG` en `config/settings.py`
+- Carpeta `log/` para almacenar archivos de log
+- Logs nombrados por fecha: `scrapecraft_YYYYMMDD.log`
+- Logging en puntos clave: inicio, carga config, driver, scraping, guardado, fin
+- Manejo de errores con traceback en logs
+
+### Changed
+- Proyecto renombrado a **ScrapeCraft**
+- `print()` reemplazado por `logger.info()` / `logger.error()` en todo el proyecto
+- `load_web_config()` ahora recibe logger como parametro
+- `scrape()` ahora recibe logger como parametro
+- README actualizado con nuevo nombre, seccion de proposito y aviso legal
+
+### Updated
+- `.gitignore` ahora ignora archivos `.log` pero mantiene `log/.gitkeep`
+
 ## [0.7.0] - 2026-01-30
 
 ### Changed

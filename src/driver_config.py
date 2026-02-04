@@ -1,4 +1,8 @@
+import logging
+
 from seleniumbase import Driver
+
+logger = logging.getLogger("scrapecraft")
 
 
 class DriverConfig:
@@ -54,6 +58,7 @@ class DriverConfig:
 
         # Inicializar el driver con las opciones configuradas
         driver = Driver(**driver_kwargs)
+        logger.info("Driver inicializado correctamente")
 
         # Configurar tamaño de ventana
         if self.window_size:

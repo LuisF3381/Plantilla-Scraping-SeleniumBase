@@ -5,13 +5,16 @@ from datetime import datetime
 import pandas as pd
 import yaml
 from src.driver_config import DriverConfig
+from src.logger import setup_logger
 from config import settings
 
 
-def load_web_config(path="config/web_config.yaml"):
+def load_web_config(logger, path="config/web_config.yaml"):
     """Carga la configuracion de la web desde el archivo YAML."""
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    logger.info(f"Configuracion cargada: {config['url']}")
+    return config
 
 
 def build_filepath(storage_config, format):
@@ -105,16 +108,19 @@ def save_data(datos, format, data_config, storage_config):
     else:
         raise ValueError(f"Formato no soportado: {format}")
 
-    print(f"Datos guardados en {filepath} ({len(datos)} registros)")
+    import logging
+    logger = logging.getLogger("scrapecraft")
+    logger.info(f"Datos guardados en {filepath} ({len(datos)} registros)")
 
 
-def scrape(driver, web_config):
+def scrape(driver, web_config, logger):
     """
     Extrae datos desde la URL usando los selectores del archivo de configuracion.
 
     Args:
         driver: Instancia del driver de SeleniumBase
         web_config: Diccionario con url, xpath_selectors y waits
+        logger: Logger para registrar eventos
 
     Returns:
         list: Lista de diccionarios con los datos extraidos
@@ -125,11 +131,12 @@ def scrape(driver, web_config):
 
     driver.uc_open_with_reconnect(url, waits["reconnect_attempts"])
     driver.uc_gui_handle_captcha()
-    print("✓ Página cargada correctamente")
+    logger.info("Pagina cargada correctamente")
 
     time.sleep(waits["after_load"])
 
     items = driver.find_elements(By.XPATH, selectors["container"])
+    logger.info(f"Encontrados {len(items)} elementos")
 
     datos = []
     for i, item in enumerate(items, 1):
@@ -146,15 +153,24 @@ def scrape(driver, web_config):
 
 
 def main():
-    web_config = load_web_config()
-    driver_config = DriverConfig(**settings.DRIVER_CONFIG)
-    driver = driver_config.get_driver()
+    logger = setup_logger(**settings.LOG_CONFIG)
+    logger.info("Iniciando scraper...")
 
     try:
-        datos = scrape(driver, web_config)
-        save_data(datos, "csv", settings.DATA_CONFIG, settings.STORAGE_CONFIG)
-    finally:
-        driver.quit()
+        web_config = load_web_config(logger)
+        driver_config = DriverConfig(**settings.DRIVER_CONFIG)
+        driver = driver_config.get_driver()
+
+        try:
+            datos = scrape(driver, web_config, logger)
+            save_data(datos, "csv", settings.DATA_CONFIG, settings.STORAGE_CONFIG)
+        finally:
+            driver.quit()
+
+        logger.info("Scraper finalizado")
+    except Exception as e:
+        logger.error(f"Error durante la ejecucion: {e}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":
