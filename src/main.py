@@ -1,3 +1,4 @@
+import logging
 import yaml
 from src.driver_config import DriverConfig
 from src.logger import setup_logger
@@ -6,7 +7,7 @@ from src.storage import save_data
 from config import settings
 
 
-def load_web_config(logger=None, path="config/web_config.yaml"):
+def load_web_config(logger: logging.Logger | None = None, path: str = "config/web_config.yaml") -> dict:
     """Carga la configuracion de la web desde el archivo YAML."""
     with open(path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -15,7 +16,7 @@ def load_web_config(logger=None, path="config/web_config.yaml"):
     return config
 
 
-def main():
+def main() -> None:
     logger = setup_logger(**settings.LOG_CONFIG)
     logger.info("Iniciando scraper...")
 
@@ -26,7 +27,9 @@ def main():
 
         try:
             datos = scrape(driver, web_config, logger)
-            save_data(datos, "csv", settings.DATA_CONFIG, settings.STORAGE_CONFIG)
+            output_formats = settings.STORAGE_CONFIG.get("output_formats", ["csv"])
+            for formato in output_formats:
+                save_data(datos, formato, settings.DATA_CONFIG, settings.STORAGE_CONFIG)
         finally:
             driver.quit()
 

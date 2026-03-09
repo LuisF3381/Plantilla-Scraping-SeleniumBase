@@ -1,10 +1,10 @@
+import logging
 import os
 from datetime import datetime
-import logging
 import pandas as pd
 
 
-def build_filepath(storage_config, format):
+def build_filepath(storage_config: dict, format: str) -> str:
     """
     Construye la ruta del archivo segun el modo de nombrado configurado.
 
@@ -15,14 +15,14 @@ def build_filepath(storage_config, format):
     Returns:
         str: Ruta completa del archivo a guardar
     """
-    output_folder = storage_config["output_folder"]
-    filename = storage_config["filename"]
-    naming_mode = storage_config["naming_mode"]
-    extension = format
+    output_folder: str = storage_config["output_folder"]
+    filename: str = storage_config["filename"]
+    naming_mode: str = storage_config["naming_mode"]
+    extension: str = format
 
     now = datetime.now()
-    date_str = now.strftime("%Y%m%d")
-    timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+    date_str: str = now.strftime("%Y%m%d")
+    timestamp_str: str = now.strftime("%Y%m%d_%H%M%S")
 
     if naming_mode == "overwrite":
         filepath = os.path.join(output_folder, f"{filename}.{extension}")
@@ -44,7 +44,7 @@ def build_filepath(storage_config, format):
     return filepath
 
 
-def save_data(datos, format, data_config, storage_config):
+def save_data(datos: list[dict], format: str, data_config: dict, storage_config: dict) -> None:
     """
     Guarda los datos en el formato y ubicacion especificados.
 
@@ -57,9 +57,9 @@ def save_data(datos, format, data_config, storage_config):
     if format not in data_config:
         raise ValueError(f"Formato no soportado: {format}. Disponibles: {list(data_config.keys())}")
 
-    df = pd.DataFrame(datos)
-    config = data_config[format]
-    filepath = build_filepath(storage_config, format)
+    df: pd.DataFrame = pd.DataFrame(datos)
+    config: dict = data_config[format]
+    filepath: str = build_filepath(storage_config, format)
 
     if format == "csv":
         df.to_csv(
@@ -95,5 +95,5 @@ def save_data(datos, format, data_config, storage_config):
     else:
         raise ValueError(f"Formato no soportado: {format}")
 
-    logger = logging.getLogger("scrapecraft")
+    logger: logging.Logger = logging.getLogger("scrapecraft")
     logger.info(f"Datos guardados en {filepath} ({len(datos)} registros)")

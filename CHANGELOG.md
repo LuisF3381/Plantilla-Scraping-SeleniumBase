@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0] - 2026-03-09
+
+### Added
+- Campo `output_formats` en `STORAGE_CONFIG` para configurar formatos de salida
+- Soporte para exportar a multiples formatos simultaneamente
+- Type hints en todos los modulos: `main.py`, `scraper.py`, `storage.py`, `driver_config.py`, `logger.py`
+
+### Changed
+- `main.py` ahora itera sobre `output_formats` para exportar a todos los formatos configurados
+- Formato de salida ya no esta hardcodeado, es configurable via `STORAGE_CONFIG`
+
 ## [0.9.0] - 2026-03-09
 
 ### Added

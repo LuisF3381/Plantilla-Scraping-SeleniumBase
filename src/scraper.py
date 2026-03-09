@@ -1,8 +1,10 @@
-from selenium.webdriver.common.by import By
+import logging
 import time
+from selenium.webdriver.common.by import By
+from seleniumbase import Driver
 
 
-def scrape(driver, web_config, logger):
+def scrape(driver: Driver, web_config: dict, logger: logging.Logger) -> list[dict]:
     """
     Extrae datos desde la URL usando los selectores del archivo de configuracion.
 
@@ -14,9 +16,9 @@ def scrape(driver, web_config, logger):
     Returns:
         list: Lista de diccionarios con los datos extraidos
     """
-    url = web_config["url"]
-    selectors = web_config["xpath_selectors"]
-    waits = web_config["waits"]
+    url: str = web_config["url"]
+    selectors: dict = web_config["xpath_selectors"]
+    waits: dict = web_config["waits"]
 
     driver.uc_open_with_reconnect(url, waits["reconnect_attempts"])
     driver.uc_gui_handle_captcha()
@@ -27,9 +29,9 @@ def scrape(driver, web_config, logger):
     items = driver.find_elements(By.XPATH, selectors["container"])
     logger.info(f"Encontrados {len(items)} elementos")
 
-    datos = []
+    datos: list[dict] = []
     for i, item in enumerate(items, 1):
-        registro = {"Numero": i}
+        registro: dict = {"Numero": i}
         for field_name, field_xpath in selectors.items():
             if field_name == "container":
                 continue

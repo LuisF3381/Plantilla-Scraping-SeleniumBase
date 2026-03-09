@@ -87,5 +87,9 @@ STORAGE_CONFIG = {
     # - "date_suffix": Añade fecha al nombre (viviendas_20260130.csv)
     # - "timestamp_suffix": Añade fecha y hora (viviendas_20260130_143052.csv)
     # - "date_folder": Crea subcarpeta con fecha (20260130/viviendas.csv)
-    "naming_mode": "date_suffix"
+    "naming_mode": "date_suffix",
+
+    # Formatos de salida: lista de formatos a exportar
+    # Opciones disponibles: "csv", "json", "xml", "xlsx"
+    "output_formats": ["csv", "json"]
 }

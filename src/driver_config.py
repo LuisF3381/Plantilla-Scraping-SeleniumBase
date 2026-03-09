@@ -1,72 +1,64 @@
 import logging
-
 from seleniumbase import Driver
 
-logger = logging.getLogger("scrapecraft")
+logger: logging.Logger = logging.getLogger("scrapecraft")
 
 
 class DriverConfig:
-    """Configuración para inicializar el driver de SeleniumBase con opciones personalizables."""
+    """Configuracion para inicializar el driver de SeleniumBase con opciones personalizables."""
 
     def __init__(
         self,
-        headless=False,
-        undetected=True,
-        maximize=True,
-        window_size=None,
-        user_agent=None,
-        proxy=None
-    ):
+        headless: bool = False,
+        undetected: bool = True,
+        maximize: bool = True,
+        window_size: tuple[int, int] | None = None,
+        user_agent: str | None = None,
+        proxy: str | None = None
+    ) -> None:
         """
-        Inicializa la configuración del driver.
+        Inicializa la configuracion del driver.
 
         Args:
-            headless (bool): Ejecutar en modo sin interfaz gráfica. Default: False
-            undetected (bool): Activar undetected-chromedriver para evadir detección. Default: True
-            maximize (bool): Maximizar la ventana del navegador. Default: True
-            window_size (tuple): Tupla (ancho, alto) para establecer tamaño específico. Default: None
-            user_agent (str): User agent personalizado. Default: None
-            proxy (str): Servidor proxy en formato "ip:puerto". Default: None
+            headless: Ejecutar en modo sin interfaz grafica. Default: False
+            undetected: Activar undetected-chromedriver para evadir deteccion. Default: True
+            maximize: Maximizar la ventana del navegador. Default: True
+            window_size: Tupla (ancho, alto) para establecer tamano especifico. Default: None
+            user_agent: User agent personalizado. Default: None
+            proxy: Servidor proxy en formato "ip:puerto". Default: None
         """
-        self.headless = headless
-        self.undetected = undetected
-        self.maximize = maximize
-        self.window_size = window_size
-        self.user_agent = user_agent
-        self.proxy = proxy
+        self.headless: bool = headless
+        self.undetected: bool = undetected
+        self.maximize: bool = maximize
+        self.window_size: tuple[int, int] | None = window_size
+        self.user_agent: str | None = user_agent
+        self.proxy: str | None = proxy
 
-    def get_driver(self):
+    def get_driver(self) -> Driver:
         """
         Crea y retorna un driver de SeleniumBase configurado con las opciones especificadas.
 
         Returns:
             Driver: Instancia del driver de SeleniumBase configurada.
         """
-        # Construir argumentos para el driver
-        driver_kwargs = {
+        driver_kwargs: dict = {
             'uc': self.undetected,
             'headless': self.headless
         }
 
-        # Agregar user agent si está especificado
         if self.user_agent:
             driver_kwargs['user_agent'] = self.user_agent
 
-        # Agregar proxy si está especificado
         if self.proxy:
             driver_kwargs['proxy'] = self.proxy
 
-        # Inicializar el driver con las opciones configuradas
-        driver = Driver(**driver_kwargs)
+        driver: Driver = Driver(**driver_kwargs)
         logger.info("Driver inicializado correctamente")
 
-        # Configurar tamaño de ventana
         if self.window_size:
-            # Si se especifica un tamaño personalizado
             width, height = self.window_size
             driver.set_window_size(width, height)
         elif self.maximize:
-            # Si no hay tamaño personalizado y maximize=True
             driver.maximize_window()
 
         return driver

@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 
-def setup_logger(log_folder="log", level="INFO"):
+def setup_logger(log_folder: str = "log", level: str = "INFO") -> logging.Logger:
     """
     Configura logger con salida a archivo y consola.
 
@@ -16,24 +16,20 @@ def setup_logger(log_folder="log", level="INFO"):
     """
     os.makedirs(log_folder, exist_ok=True)
 
-    log_file = os.path.join(log_folder, f"scrapecraft_{datetime.now():%Y%m%d}.log")
+    log_file: str = os.path.join(log_folder, f"scrapecraft_{datetime.now():%Y%m%d}.log")
 
-    logger = logging.getLogger("scrapecraft")
+    logger: logging.Logger = logging.getLogger("scrapecraft")
     logger.setLevel(getattr(logging, level.upper()))
 
-    # Evitar duplicar handlers si se llama múltiples veces
     if logger.handlers:
         return logger
 
-    # Formato: timestamp - nivel - mensaje
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    formatter: logging.Formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
-    # Handler archivo
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler: logging.FileHandler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
 
-    # Handler consola
-    console_handler = logging.StreamHandler()
+    console_handler: logging.StreamHandler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
     logger.addHandler(file_handler)

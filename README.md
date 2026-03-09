@@ -141,8 +141,14 @@ Configura donde y como se guardan los archivos:
 STORAGE_CONFIG = {
     "output_folder": "output",
     "filename": "viviendas",
-    "naming_mode": "date_suffix"
+    "naming_mode": "date_suffix",
+    "output_formats": ["csv"]  # Opciones: "csv", "json", "xml", "xlsx"
 }
+```
+
+Para exportar a múltiples formatos simultáneamente:
+```python
+"output_formats": ["csv", "json", "xlsx"]
 ```
 
 #### Modos de nombrado (`naming_mode`)
