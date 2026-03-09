@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.9.0] - 2026-03-09
+
+### Added
+- Modulo `src/scraper.py` con funcion `scrape()` para logica de extraccion
+- Modulo `src/storage.py` con funciones `save_data()` y `build_filepath()`
+- Seccion "Arquitectura" en README con diagrama de flujo
+- Seccion "API Reference" en README con documentacion de funciones publicas
+
+### Changed
+- Refactorizacion de `main.py` aplicando Single Responsibility Principle
+- `main.py` reducido de 177 a 39 lineas (solo orquestacion)
+- `load_web_config()` ahora tiene logger como parametro opcional (compatibilidad con tests)
+- README actualizado con nueva estructura de archivos
+
+### Architecture
+- Separacion de responsabilidades en 3 modulos:
+  - `main.py`: Orquestacion del flujo
+  - `scraper.py`: Logica de extraccion de datos
+  - `storage.py`: Persistencia y exportacion
+
 ## [0.8.0] - 2026-02-03
 
 ### Added

@@ -13,20 +13,51 @@ ScrapeCraft busca ser un punto de partida para cualquier persona que quiera apre
 ## Estructura
 
 ```
+ScrapeCraft/
 ├── src/                      # Codigo fuente
-│   ├── main.py               # Script principal
+│   ├── main.py               # Orquestacion principal
+│   ├── scraper.py            # Logica de extraccion de datos
+│   ├── storage.py            # Almacenamiento y exportacion
 │   ├── driver_config.py      # Configuracion del driver
 │   └── logger.py             # Sistema de logging
 ├── config/                   # Configuraciones
 │   ├── settings.py           # Config del driver, datos y logging
 │   └── web_config.yaml       # URL, selectores y waits
+├── tests/                    # Tests de validacion
+│   └── test_config.py
 ├── log/                      # Logs de ejecucion
 ├── output/                   # Archivos generados
-├── tests/                    # Tests
 ├── requirements.txt
 ├── CHANGELOG.md
 └── LICENSE
 ```
+
+## Arquitectura
+
+El proyecto sigue el principio de **separacion de responsabilidades**:
+
+```
+main.py (Orquestacion)
+    │
+    ├── load_web_config()     # Carga config/web_config.yaml
+    │
+    ├── scraper.py
+    │   └── scrape()          # Extrae datos de la web
+    │
+    └── storage.py
+        ├── build_filepath()  # Construye rutas segun naming_mode
+        └── save_data()       # Exporta a CSV/JSON/XML/Excel
+```
+
+### Modulos
+
+| Modulo | Responsabilidad |
+|--------|-----------------|
+| `main.py` | Orquestacion del flujo: cargar config, ejecutar scraping, guardar datos |
+| `scraper.py` | Logica de extraccion: navegar, manejar CAPTCHA, extraer elementos |
+| `storage.py` | Persistencia: construir rutas, exportar en multiples formatos |
+| `driver_config.py` | Inicializacion del navegador con opciones anti-deteccion |
+| `logger.py` | Sistema de logging dual (archivo + consola) |
 
 ## Instalacion
 
@@ -92,6 +123,8 @@ DATA_CONFIG = {
 Uso en codigo:
 
 ```python
+from src.storage import save_data
+
 # Exportar a un formato
 save_data(datos, "csv", settings.DATA_CONFIG, settings.STORAGE_CONFIG)
 
@@ -146,6 +179,81 @@ python -m src.main
 pytest tests/ -v
 ```
 
+## API Reference
+
+### scraper.py
+
+```python
+def scrape(driver, web_config, logger) -> list[dict]:
+    """
+    Extrae datos desde la URL usando los selectores del archivo de configuracion.
+
+    Args:
+        driver: Instancia del driver de SeleniumBase
+        web_config: Diccionario con url, xpath_selectors y waits
+        logger: Logger para registrar eventos
+
+    Returns:
+        Lista de diccionarios con los datos extraidos
+    """
+```
+
+### storage.py
+
+```python
+def save_data(datos, format, data_config, storage_config) -> None:
+    """
+    Guarda los datos en el formato y ubicacion especificados.
+
+    Args:
+        datos: Lista de diccionarios con los datos a guardar
+        format: Formato de salida (csv, json, xml, xlsx)
+        data_config: Diccionario con configuraciones de cada formato
+        storage_config: Diccionario con configuracion de almacenamiento
+    """
+
+def build_filepath(storage_config, format) -> str:
+    """
+    Construye la ruta del archivo segun el modo de nombrado configurado.
+
+    Args:
+        storage_config: Diccionario con configuracion de almacenamiento
+        format: Formato de salida (csv, json, xml, xlsx)
+
+    Returns:
+        Ruta completa del archivo a guardar
+    """
+```
+
+### main.py
+
+```python
+def load_web_config(logger=None, path="config/web_config.yaml") -> dict:
+    """
+    Carga la configuracion de la web desde el archivo YAML.
+
+    Args:
+        logger: Logger opcional para registrar eventos
+        path: Ruta al archivo de configuracion
+
+    Returns:
+        Diccionario con url, xpath_selectors y waits
+    """
+
+def main() -> None:
+    """
+    Funcion principal que orquesta el proceso de scraping.
+
+    Flujo:
+    1. Configura el logger
+    2. Carga la configuracion web desde YAML
+    3. Inicializa el driver con las opciones de settings
+    4. Ejecuta el scraping
+    5. Guarda los datos
+    6. Cierra el driver
+    """
+```
+
 ## Tests
 
 ### WebConfig
@@ -183,6 +291,7 @@ pytest tests/ -v
 - pandas
 - pyyaml
 - pytest
+- openpyxl
 
 ## Licencia
 
