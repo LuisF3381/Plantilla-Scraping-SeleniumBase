@@ -2,9 +2,9 @@ import pytest
 import os
 import re
 from urllib.parse import urlparse
-from src.driver_config import DriverConfig
-from src.main import load_web_config
-from config import settings
+from src.shared.driver_config import DriverConfig
+from src.viviendas_adonde.app_job import load_web_config
+from config.viviendas_adonde import settings
 
 
 class TestWebConfig:
@@ -12,8 +12,8 @@ class TestWebConfig:
 
     def test_web_config_file_exists(self):
         """Verifica que existe el archivo web_config.yaml."""
-        assert os.path.exists("config/web_config.yaml"), "No existe config/web_config.yaml"
-        print("✓ config/web_config.yaml existe")
+        assert os.path.exists("config/viviendas_adonde/web_config.yaml"), "No existe config/viviendas_adonde/web_config.yaml"
+        print("[OK] config/viviendas_adonde/web_config.yaml existe")
 
     def test_web_config_has_required_keys(self):
         """Verifica que el YAML tiene las claves requeridas."""
@@ -21,7 +21,7 @@ class TestWebConfig:
         assert "url" in web_config, "Falta 'url' en web_config.yaml"
         assert "xpath_selectors" in web_config, "Falta 'xpath_selectors' en web_config.yaml"
         assert "waits" in web_config, "Falta 'waits' en web_config.yaml"
-        print("✓ web_config.yaml tiene todas las claves requeridas")
+        print("[OK] web_config.yaml tiene todas las claves requeridas")
 
     def test_url_format_is_valid(self):
         """Verifica que la URL tiene formato válido."""
@@ -30,7 +30,7 @@ class TestWebConfig:
         parsed = urlparse(url)
         assert parsed.scheme in ("http", "https"), f"URL debe empezar con http/https: {url}"
         assert parsed.netloc, f"URL no tiene dominio válido: {url}"
-        print(f"✓ URL válida: {url}")
+        print(f"[OK] URL válida: {url}")
 
     def test_xpath_selectors_format(self):
         """Verifica que los selectores XPath tienen formato válido."""
@@ -42,7 +42,7 @@ class TestWebConfig:
 
         for name, xpath in selectors.items():
             assert xpath_pattern.match(xpath), f"XPath inválido para '{name}': {xpath} (debe empezar con / o // o .//)"
-            print(f"✓ XPath válido para '{name}'")
+            print(f"[OK] XPath válido para '{name}'")
 
     def test_waits_are_positive_numbers(self):
         """Verifica que los waits son números positivos."""
@@ -51,18 +51,7 @@ class TestWebConfig:
 
         assert waits.get("reconnect_attempts", 0) > 0, "reconnect_attempts debe ser > 0"
         assert waits.get("after_load", 0) >= 0, "after_load debe ser >= 0"
-        print("✓ Waits tienen valores válidos")
-
-
-class TestDataConfig:
-    """Tests para validar DATA_CONFIG en settings.py"""
-
-    def test_settings_has_data_config(self):
-        """Verifica que settings.py tiene DATA_CONFIG con al menos un formato."""
-        assert hasattr(settings, 'DATA_CONFIG'), "Falta DATA_CONFIG en settings.py"
-        assert isinstance(settings.DATA_CONFIG, dict), "DATA_CONFIG debe ser un diccionario"
-        assert len(settings.DATA_CONFIG) > 0, "DATA_CONFIG debe tener al menos un formato"
-        print(f"✓ DATA_CONFIG contiene {len(settings.DATA_CONFIG)} formato(s): {list(settings.DATA_CONFIG.keys())}")
+        print("[OK] Waits tienen valores válidos")
 
 
 class TestStorageConfig:
@@ -72,27 +61,27 @@ class TestStorageConfig:
         """Verifica que settings.py tiene STORAGE_CONFIG."""
         assert hasattr(settings, 'STORAGE_CONFIG')
         assert isinstance(settings.STORAGE_CONFIG, dict)
-        print("✓ settings.py contiene STORAGE_CONFIG")
+        print("[OK] settings.py contiene STORAGE_CONFIG")
 
     def test_storage_config_has_required_keys(self):
         """Verifica que STORAGE_CONFIG tiene las claves requeridas."""
         required_keys = ["output_folder", "filename", "naming_mode"]
         for key in required_keys:
             assert key in settings.STORAGE_CONFIG, f"Falta '{key}' en STORAGE_CONFIG"
-        print("✓ STORAGE_CONFIG tiene todas las claves requeridas")
+        print("[OK] STORAGE_CONFIG tiene todas las claves requeridas")
 
     def test_storage_config_naming_mode_is_valid(self):
         """Verifica que naming_mode es válido."""
         valid_modes = ["overwrite", "date_suffix", "timestamp_suffix", "date_folder"]
         mode = settings.STORAGE_CONFIG["naming_mode"]
         assert mode in valid_modes, f"Modo inválido: {mode}. Debe ser uno de {valid_modes}"
-        print(f"✓ Modo de nombrado válido: {mode}")
+        print(f"[OK] Modo de nombrado válido: {mode}")
 
     def test_storage_config_output_folder_exists(self):
         """Verifica que la carpeta de salida existe."""
         folder = settings.STORAGE_CONFIG["output_folder"]
         assert os.path.isdir(folder), f"Carpeta de salida no existe: {folder}"
-        print(f"✓ Carpeta de salida existe: {folder}")
+        print(f"[OK] Carpeta de salida existe: {folder}")
 
 
 class TestDriverConfig:
@@ -102,7 +91,7 @@ class TestDriverConfig:
         """Verifica que settings.py tiene la configuración DRIVER_CONFIG."""
         assert hasattr(settings, 'DRIVER_CONFIG')
         assert isinstance(settings.DRIVER_CONFIG, dict)
-        print("✓ settings.py contiene DRIVER_CONFIG")
+        print("[OK] settings.py contiene DRIVER_CONFIG")
 
     def test_driver_instance_created_with_settings_file(self):
         """
@@ -118,7 +107,7 @@ class TestDriverConfig:
 
         try:
             assert driver is not None
-            print("✓ Driver inicializado correctamente con configuración de settings.py")
+            print("[OK] Driver inicializado correctamente con configuración de settings.py")
         finally:
             driver.quit()
 
@@ -130,26 +119,26 @@ class TestRawConfig:
         """Verifica que settings.py tiene RAW_CONFIG."""
         assert hasattr(settings, 'RAW_CONFIG')
         assert isinstance(settings.RAW_CONFIG, dict)
-        print("✓ settings.py contiene RAW_CONFIG")
+        print("[OK] settings.py contiene RAW_CONFIG")
 
     def test_raw_config_has_required_keys(self):
         """Verifica que RAW_CONFIG tiene las claves requeridas."""
         required_keys = ["raw_folder", "filename", "format", "retention"]
         for key in required_keys:
             assert key in settings.RAW_CONFIG, f"Falta '{key}' en RAW_CONFIG"
-        print("✓ RAW_CONFIG tiene todas las claves requeridas")
+        print("[OK] RAW_CONFIG tiene todas las claves requeridas")
 
     def test_raw_config_format_is_csv(self):
         """Verifica que el formato raw es csv."""
         assert settings.RAW_CONFIG["format"] == "csv", "El formato raw debe ser 'csv'"
-        print("✓ Formato raw es csv")
+        print("[OK] Formato raw es csv")
 
     def test_raw_config_retention_mode_is_valid(self):
         """Verifica que el modo de retencion es valido."""
         valid_modes = ["keep_all", "keep_last_n", "keep_days"]
         mode = settings.RAW_CONFIG["retention"]["mode"]
         assert mode in valid_modes, f"Modo invalido: {mode}. Debe ser uno de {valid_modes}"
-        print(f"✓ Modo de retencion valido: {mode}")
+        print(f"[OK] Modo de retencion valido: {mode}")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ def scrape(driver: Driver, web_config: dict, logger: logging.Logger) -> list[dic
     # Estructura de datos para almacenar los resultados
     datos: list[dict] = []
 
-    # Navegacion a la pagina 
+    # Navegacion a la pagina
     driver.uc_open_with_reconnect(url, waits["reconnect_attempts"])
     driver.uc_gui_handle_captcha()
     logger.info("Pagina cargada correctamente")

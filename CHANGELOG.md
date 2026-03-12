@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.12.0] - 2026-03-12
+
+### Added
+- Soporte para **multiples procesos de scraping** mediante arquitectura multi-job
+- Carpeta `src/shared/` con modulos reutilizables entre todos los jobs: `storage.py`, `driver_config.py`, `logger.py`
+- Carpeta `src/viviendas_adonde/` como primer job concreto, con `scraper.py`, `process.py` y `app_job.py`
+- Modulo `app_job.py` por proceso: encapsula el flujo ETL completo y expone `run(args)` como interfaz estandar
+- Funcion `load_web_config()` movida de `main.py` a cada `app_job.py` con su ruta de config propia
+- `config/global_settings.py` con configuracion compartida entre todos los jobs: `LOG_CONFIG` y `DATA_CONFIG`
+- Carpeta `config/viviendas_adonde/` con `settings.py` (config especifica del job) y `web_config.yaml`
+- Carpetas de salida por proceso: `output/viviendas_adonde/` y `raw/viviendas_adonde/`
+- Tests globales en `tests/test_global.py`: `TestLogConfig` y `TestDataConfig`
+- Tests por proceso en `tests/viviendas_adonde/test_config.py`: `TestWebConfig`, `TestStorageConfig`, `TestDriverConfig`, `TestRawConfig`
+
+### Changed
+- `main.py` refactorizado como **dispatcher dinamico**: carga el job indicado via `importlib` y llama `run(args)`
+- CLI actualizado: argumento `--job` requerido para indicar el proceso a ejecutar
+- `config/viviendas_adonde/settings.py` ahora solo contiene `DRIVER_CONFIG`, `STORAGE_CONFIG` y `RAW_CONFIG`
+- `STORAGE_CONFIG["output_folder"]` actualizado a `output/viviendas_adonde`
+- `RAW_CONFIG["raw_folder"]` actualizado a `raw/viviendas_adonde`
+- Tests reorganizados en subdirectorios por proceso (espejo de la estructura `src/`)
+
+### Removed
+- `src/scraper.py`, `src/process.py`, `src/storage.py`, `src/driver_config.py`, `src/logger.py` — movidos a `src/shared/` o `src/viviendas_adonde/`
+- `config/settings.py` y `config/web_config.yaml` — reemplazados por `config/global_settings.py` y `config/viviendas_adonde/`
+- `tests/test_config.py` — reemplazado por `tests/test_global.py` y `tests/viviendas_adonde/test_config.py`
+
+### Architecture
+- Patron **multi-job dispatcher**: `main.py` es generico y delega en cada `app_job.py` segun `--job`
+- Convencion de interfaz: todo job debe exponer `def run(args: argparse.Namespace) -> None` en su `app_job.py`
+- Agregar un nuevo proceso = crear `src/<nombre>/app_job.py` + `config/<nombre>/` sin modificar `main.py`
+- Tests siguen la misma estructura de carpetas que `src/` y `config/`
+
+### CLI
+```bash
+python -m src.main --job viviendas_adonde
+python -m src.main --job viviendas_adonde --reprocess 20260312_143052
+```
+
 ## [0.11.0] - 2026-03-12
 
 ### Added

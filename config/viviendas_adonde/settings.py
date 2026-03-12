@@ -1,18 +1,7 @@
 """
-Archivo de configuracion para ScrapeCraft.
+Configuracion especifica del job viviendas_adonde.
+Para configuracion global (logs, formatos) ver config/global_settings.py
 """
-
-# ============================================
-# CONFIGURACIÓN DE LOGGING
-# ============================================
-
-LOG_CONFIG = {
-    # Carpeta donde se guardan los logs
-    "log_folder": "log",
-
-    # Nivel de logging: DEBUG, INFO, WARNING, ERROR
-    "level": "INFO"
-}
 
 # ============================================
 # CONFIGURACIÓN DEL DRIVER
@@ -40,44 +29,12 @@ DRIVER_CONFIG = {
 }
 
 # ============================================
-# CONFIGURACIÓN DE DATOS (formatos de exportación)
-# ============================================
-
-DATA_CONFIG = {
-    # Configuración para CSV
-    "csv": {
-        "encoding": "utf-8",
-        "separator": ";",
-        "index": False
-    },
-
-    # Configuración para JSON
-    "json": {
-        "indent": 2,
-        "force_ascii": False,
-        "orient": "records"
-    },
-
-    # Configuración para XML
-    "xml": {
-        "root": "registros",
-        "row": "registro"
-    },
-
-    # Configuración para Excel
-    "xlsx": {
-        "sheet_name": "Datos",
-        "index": False
-    }
-}
-
-# ============================================
 # CONFIGURACIÓN DE ALMACENAMIENTO
 # ============================================
 
 STORAGE_CONFIG = {
     # Carpeta de salida (relativa a la raíz del proyecto)
-    "output_folder": "output",
+    "output_folder": "output/viviendas_adonde",
 
     # Nombre base del archivo (sin extensión)
     "filename": "viviendas",
@@ -100,7 +57,7 @@ STORAGE_CONFIG = {
 
 RAW_CONFIG = {
     # Carpeta donde se guardan los archivos raw
-    "raw_folder": "raw",
+    "raw_folder": "raw/viviendas_adonde",
 
     # Nombre base del archivo raw (sin extension ni sufijo)
     "filename": "viviendas",
