@@ -98,6 +98,9 @@ pip install -r requirements.txt
 ## Uso
 
 ```bash
+# Ver los jobs disponibles
+python -m src.main --list
+
 # Ejecutar un job completo (scraping + procesamiento + guardado)
 python -m src.main --job viviendas_adonde
 
@@ -114,7 +117,7 @@ pytest tests/test_global.py -v
 pytest tests/viviendas_adonde/ -v
 ```
 
-### Flujo completo
+### Flujo completo (`skip_process=False`)
 
 ```
 scrape() → save_raw() → del datos → process() → cleanup_raw() → save_data()
@@ -124,6 +127,14 @@ scrape() → save_raw() → del datos → process() → cleanup_raw() → save_d
 2. Libera la memoria del raw y aplica las transformaciones definidas en `process.py`
 3. Limpia archivos antiguos de `raw/<job>/` segun la politica de retencion configurada
 4. Guarda el resultado final en `output/<job>/` en los formatos configurados
+
+### Flujo sin procesamiento (`skip_process=True`)
+
+```
+scrape() → save_raw() → del datos → cleanup_raw() → save_data()
+```
+
+Util cuando la web ya devuelve datos normalizados y no se requiere transformacion. Se activa con `PIPELINE_CONFIG["skip_process"] = True` en `settings.py`.
 
 ### Reprocesamiento
 
@@ -190,6 +201,10 @@ RAW_CONFIG = {
         "value": 5
     }
 }
+
+PIPELINE_CONFIG = {
+    "skip_process": False   # True: omite process.py y guarda el raw directamente
+}
 ```
 
 #### Modos de nombrado (`naming_mode`)
@@ -230,10 +245,11 @@ waits:
 2. Crear `src/<nombre>/scraper.py` con la logica de extraccion
 3. Crear `src/<nombre>/utils.py` con funciones auxiliares de extraccion
 4. Crear `src/<nombre>/process.py` con la logica de transformacion
-5. Crear `config/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG` y `RAW_CONFIG`
+5. Crear `config/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG` y `PIPELINE_CONFIG`
 6. Crear `config/<nombre>/web_config.yaml` con la URL y los selectores
 
 Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion.
+`WEB_CONFIG_PATH` en `app_job.py` se resuelve automaticamente desde el nombre de la carpeta del job — no requiere modificacion manual.
 
 Luego ejecutar:
 
@@ -262,13 +278,16 @@ def process(filename: str, extension: str, suffix: str, raw_config: dict, logger
 ### `src/shared/storage.py`
 
 ```python
-def save_data(datos, format, data_config, storage_config) -> None:
+def save_data(datos, format, data_config, storage_config, logger=None) -> None:
     """Guarda los datos en el formato y ubicacion especificados."""
 
-def save_raw(datos, raw_config) -> str:
+def save_raw(datos, raw_config, logger=None) -> str:
     """Guarda datos en bruto como CSV. Retorna el sufijo timestamp generado."""
 
-def cleanup_raw(raw_config) -> None:
+def load_raw(filename, extension, suffix, raw_config) -> list[dict]:
+    """Lee un raw existente y lo retorna como lista de dicts sin transformar."""
+
+def cleanup_raw(raw_config, logger=None) -> None:
     """Limpia archivos raw segun la politica de retencion configurada."""
 
 def build_filepath(storage_config, format) -> str:

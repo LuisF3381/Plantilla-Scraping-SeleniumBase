@@ -1,7 +1,25 @@
-# url de la web
+# =============================================================================
+# URL de la pagina a scrapear
+# =============================================================================
 url: "https://www.adondevivir.com/inmuebles-en-alquiler.html"
 
-# selectores de los elementos web
+# =============================================================================
+# Selectores XPath
+#
+# - container: OBLIGATORIO. XPath absoluto al elemento que se repite una vez
+#              por registro (ej: la tarjeta de un producto, un anuncio, etc.).
+#              Es la palabra reservada del sistema — no renombrar.
+#
+# - Resto de campos: XPath relativo al container (deben empezar con .//).
+#                    El nombre del campo se convierte en columna en el output.
+#                    Si el elemento no existe en un registro, se guarda "".
+#
+# Sintaxis rapida:
+#   //tag[@attr="valor"]          → busca en toda la pagina (solo para container)
+#   .//tag[@attr="valor"]         → busca dentro del container (campos)
+#   .//tag[@data-qa="valor"]      → atributo data-*
+#   .//tag[contains(@class,"x")]  → clase parcial
+# =============================================================================
 xpath_selectors:
   container: '//div[@class="postingCard-module__posting-container"]'
   Precio: './/div[@class="postingPrices-module__price"]'
@@ -9,7 +27,16 @@ xpath_selectors:
   Caracteristicas: './/h3'
   Descripcion: './/div[@data-qa="POSTING_CARD_DESCRIPTION"]'
 
-# waits en segundos para esperar elementos
+# =============================================================================
+# Tiempos de espera
+#
+# - reconnect_attempts: Intentos de reconexion si la pagina no carga.
+#                       Util para sitios lentos o con proteccion anti-bot.
+#
+# - after_load: Segundos de espera tras la carga inicial de la pagina.
+#               Necesario cuando el contenido se renderiza con JavaScript
+#               despues del evento de carga (ej: infinite scroll, lazy load).
+# =============================================================================
 waits:
   reconnect_attempts: 3
   after_load: 5

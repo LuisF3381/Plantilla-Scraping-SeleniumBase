@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.15.0] - 2026-03-12
+
+### Changed
+- `web_config.yaml` documentado con comentarios inline detallados: explicacion de `container` como campo reservado, sintaxis rapida de XPath, y descripcion de cada parametro de `waits`
+- `WEB_CONFIG_PATH` en `app_job.py` ahora se deriva automaticamente del nombre de la carpeta del job via `Path(__file__).parent.name`, eliminando el string hardcodeado que debia actualizarse manualmente al copiar el job
+
+## [0.14.0] - 2026-03-12
+
+### Added
+- `PIPELINE_CONFIG` en `config/<job>/settings.py` con flag `skip_process` (bool):
+  - `False` (default): flujo completo con `process.py`
+  - `True`: omite `process.py` y guarda el raw directamente, util cuando la web ya devuelve datos normalizados
+- Funcion `load_raw()` en `storage.py`: lee un CSV raw y lo retorna como `list[dict]` sin transformaciones
+- Flag `--list` en `main.py`: muestra los jobs disponibles escaneando `src/` dinamicamente
+- Funcion `get_available_jobs()` en `main.py`: detecta cualquier carpeta en `src/` que contenga `app_job.py`
+
+### Changed
+- `_run_full()` en `app_job.py` bifurca segun `PIPELINE_CONFIG["skip_process"]`: llama a `process()` o a `load_raw()`
+- `--job` ya no es requerido si se usa `--list`; sin argumentos muestra un mensaje guiando al usuario
+- Error de job no encontrado ahora incluye la lista de jobs disponibles inline
+- `save_data()`, `save_raw()` y `cleanup_raw()` en `storage.py` reciben `logger` como parametro opcional en lugar de obtenerlo internamente via `logging.getLogger()`
+- Mapa del flujo ETL en `app_job.py` actualizado con el caso `skip_process=True`
+
+### Architecture
+- El pipeline ETL ahora tiene tres variantes configurables:
+  - Flujo completo: `scrape → save_raw → process → cleanup_raw → save_data`
+  - Sin proceso: `scrape → save_raw → cleanup_raw → save_data`
+  - Reprocess: `process → save_data`
+
 ## [0.13.0] - 2026-03-12
 
 ### Added

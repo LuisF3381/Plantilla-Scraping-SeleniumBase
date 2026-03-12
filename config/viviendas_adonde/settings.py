@@ -52,6 +52,16 @@ STORAGE_CONFIG = {
 }
 
 # ============================================
+# CONFIGURACIÓN DEL PIPELINE
+# ============================================
+
+PIPELINE_CONFIG = {
+    # skip_process: Si es True, omite el paso de process.py y guarda el raw directamente.
+    # Util cuando la web ya devuelve datos normalizados y no se requiere transformacion.
+    "skip_process": False
+}
+
+# ============================================
 # CONFIGURACIÓN DE RAW (datos en bruto)
 # ============================================
 

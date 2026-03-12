@@ -1,9 +1,10 @@
 import argparse
 import logging
 import yaml
+from pathlib import Path
 from src.shared.driver_config import DriverConfig
 from src.shared.logger import setup_logger
-from src.shared.storage import save_data, save_raw, cleanup_raw
+from src.shared.storage import save_data, save_raw, cleanup_raw, load_raw
 from src.viviendas_adonde.scraper import scrape
 from src.viviendas_adonde.process import process
 from config import global_settings
@@ -12,10 +13,16 @@ from config.viviendas_adonde import settings
 # ---------------------------------------------------------------------------
 # FLUJO ETL — vision general
 #
-#   FLUJO COMPLETO:
+#   FLUJO COMPLETO (skip_process=False):
 #     run() → _run_full() → scrape()    → [scraper.py]   <- implementar aqui
 #                         → save_raw()
 #                         → process()   → [process.py]   <- implementar aqui
+#                         → cleanup_raw()
+#           → _save_output()
+#
+#   FLUJO SIN PROCESS (skip_process=True en PIPELINE_CONFIG):
+#     run() → _run_full() → scrape()
+#                         → save_raw()
 #                         → cleanup_raw()
 #           → _save_output()
 #
@@ -27,7 +34,9 @@ from config.viviendas_adonde import settings
 #   Este archivo no requiere modificaciones.
 # ---------------------------------------------------------------------------
 
-WEB_CONFIG_PATH = "config/viviendas_adonde/web_config.yaml"
+# Se deriva automaticamente del nombre de la carpeta del job (no modificar)
+_JOB_NAME = Path(__file__).parent.name
+WEB_CONFIG_PATH = f"config/{_JOB_NAME}/web_config.yaml"
 
 
 def load_web_config(logger: logging.Logger | None = None) -> dict:
@@ -44,7 +53,7 @@ def load_web_config(logger: logging.Logger | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def _run_full(logger: logging.Logger) -> list[dict]:
-    """Flujo completo: scraping → raw → procesamiento → limpieza de raw."""
+    """Flujo completo: scraping → raw → (proceso opcional) → limpieza de raw."""
     logger.info("Iniciando scraper...")
 
     web_config = load_web_config(logger)
@@ -55,18 +64,29 @@ def _run_full(logger: logging.Logger) -> list[dict]:
     finally:
         driver.quit()
 
-    suffix: str = save_raw(datos, settings.RAW_CONFIG)
+    suffix: str = save_raw(datos, settings.RAW_CONFIG, logger)
     del datos
 
-    processed = process(
-        filename=settings.RAW_CONFIG["filename"],
-        extension=settings.RAW_CONFIG["format"],
-        suffix=suffix,
-        raw_config=settings.RAW_CONFIG,
-        logger=logger,
-    )
+    skip_process: bool = settings.PIPELINE_CONFIG.get("skip_process", False)
 
-    cleanup_raw(settings.RAW_CONFIG)
+    if skip_process:
+        logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
+        processed = load_raw(
+            filename=settings.RAW_CONFIG["filename"],
+            extension=settings.RAW_CONFIG["format"],
+            suffix=suffix,
+            raw_config=settings.RAW_CONFIG,
+        )
+    else:
+        processed = process(
+            filename=settings.RAW_CONFIG["filename"],
+            extension=settings.RAW_CONFIG["format"],
+            suffix=suffix,
+            raw_config=settings.RAW_CONFIG,
+            logger=logger,
+        )
+
+    cleanup_raw(settings.RAW_CONFIG, logger)
     return processed
 
 
@@ -86,7 +106,7 @@ def _save_output(processed: list[dict], logger: logging.Logger) -> None:
     """Guarda los datos procesados en todos los formatos configurados."""
     output_formats = settings.STORAGE_CONFIG.get("output_formats", ["csv"])
     for formato in output_formats:
-        save_data(processed, formato, global_settings.DATA_CONFIG, settings.STORAGE_CONFIG)
+        save_data(processed, formato, global_settings.DATA_CONFIG, settings.STORAGE_CONFIG, logger)
     logger.info("Proceso finalizado")
 
 
