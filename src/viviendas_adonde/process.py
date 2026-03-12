@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 
-def process(filename: str, extension: str, suffix: str, raw_config: dict) -> list[dict]:
+def process(filename: str, extension: str, suffix: str, raw_config: dict, logger: logging.Logger | None = None) -> list[dict]:
     """
     Lee el archivo raw y aplica transformaciones a los datos.
 
@@ -12,14 +12,21 @@ def process(filename: str, extension: str, suffix: str, raw_config: dict) -> lis
         extension:  Extension del archivo   (ej: "csv")
         suffix:     Sufijo timestamp de la ejecucion (ej: "20260312_143052")
         raw_config: Diccionario con configuracion del raw
+        logger:     Logger para registrar eventos
 
     Returns:
         list[dict]: Lista de diccionarios con los datos procesados
     """
+
+    # Lee el path del archivo raw temporal
     filepath: str = os.path.join(raw_config["raw_folder"], f"{filename}_{suffix}.{extension}")
-    df: pd.DataFrame = pd.read_csv(filepath)
+
+    # CODIGO IMPLEMENTA DATA ENGINEER
 
     # --- Inicio del procesamiento ---
+    
+    # Lee el archivo raw en un DataFrame de pandas
+    df: pd.DataFrame = pd.read_csv(filepath)
 
     # Limpieza de espacios en todas las columnas de texto
     for col in df.select_dtypes(include="object").columns:
@@ -34,8 +41,7 @@ def process(filename: str, extension: str, suffix: str, raw_config: dict) -> lis
         )
 
     # --- Fin del procesamiento ---
-
-    logger: logging.Logger = logging.getLogger("scrapecraft")
-    logger.info(f"Procesamiento completado: {len(df)} registros")
+    if logger:
+        logger.info(f"Procesamiento completado: {len(df)} registros")
 
     return df.to_dict(orient="records")

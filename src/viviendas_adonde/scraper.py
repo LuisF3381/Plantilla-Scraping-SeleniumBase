@@ -2,6 +2,7 @@ import logging
 import time
 from selenium.webdriver.common.by import By
 from seleniumbase import Driver
+from src.viviendas_adonde.utils import parse_record
 
 
 def scrape(driver: Driver, web_config: dict, logger: logging.Logger) -> list[dict]:
@@ -9,40 +10,34 @@ def scrape(driver: Driver, web_config: dict, logger: logging.Logger) -> list[dic
     Extrae datos desde la URL usando los selectores del archivo de configuracion.
 
     Args:
-        driver: Instancia del driver de SeleniumBase
+        driver:     Instancia del driver de SeleniumBase
         web_config: Diccionario con url, xpath_selectors y waits
-        logger: Logger para registrar eventos
+        logger:     Logger para registrar eventos
 
     Returns:
-        list: Lista de diccionarios con los datos extraidos
+        list[dict]: Lista de diccionarios con los datos extraidos
     """
-    # Obtienen los parametros para la ejecucion del proceso de scraping
     url: str = web_config["url"]
     selectors: dict = web_config["xpath_selectors"]
     waits: dict = web_config["waits"]
 
-    # Estructura de datos para almacenar los resultados
-    datos: list[dict] = []
-
-    # Navegacion a la pagina
+    # --- Navegacion y carga de pagina ---
     driver.uc_open_with_reconnect(url, waits["reconnect_attempts"])
     driver.uc_gui_handle_captcha()
     logger.info("Pagina cargada correctamente")
-
     time.sleep(waits["after_load"])
 
-    # Proceso de extraccion de datos
+    # --- Extraccion de elementos ---
+    # IMPLEMENTAR: ajustar el selector "container" en web_config.yaml
     items = driver.find_elements(By.XPATH, selectors["container"])
     logger.info(f"Encontrados {len(items)} elementos")
 
-    for i, item in enumerate(items, 1):
-        registro: dict = {"Numero": i}
-        for field_name, field_xpath in selectors.items():
-            if field_name == "container":
-                continue
-            text = item.find_element(By.XPATH, field_xpath).text
-            registro[field_name] = text.replace("\n", " | ").strip()
-        datos.append(registro)
+    # --- Construccion de registros ---
+    # IMPLEMENTAR: agregar logica personalizada en utils.py si se necesita
+    #              tratamiento especial por campo (paginacion, campos opcionales, etc.)
+    datos: list[dict] = [
+        parse_record(item, selectors, index)
+        for index, item in enumerate(items, start=1)
+    ]
 
-    # Registro de informacion sobre el proceso de scraping
     return datos

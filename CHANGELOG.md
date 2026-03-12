@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.13.0] - 2026-03-12
+
+### Added
+- Nuevo modulo `src/<job>/utils.py` con funciones auxiliares de extraccion reutilizables:
+  - `safe_get_text(element, xpath, fallback)`: extrae texto de un sub-elemento con manejo seguro de `NoSuchElementException`
+  - `parse_record(item, selectors, index)`: construye el diccionario de un registro a partir de un elemento contenedor
+
+### Changed
+- `app_job.py` refactorizado para mayor legibilidad:
+  - `run()` queda como dispatcher limpio de ~10 lineas
+  - Logica extraida en funciones privadas: `_run_full()`, `_run_reprocess()`, `_save_output()`
+  - Bloque de comentario con mapa visual del flujo ETL al inicio del archivo
+- `scraper.py` refactorizado para usar `utils.py`:
+  - For-loop de extraccion de campos reemplazado por llamada a `parse_record()`
+  - Secciones marcadas con `# IMPLEMENTAR` para guiar al data engineer
+- `process()` en `process.py` ahora recibe `logger` como parametro opcional en lugar de obtenerlo internamente via `logging.getLogger()`
+- `build_filepath()` en `storage.py` ahora crea automaticamente la carpeta de salida con `os.makedirs(exist_ok=True)` si no existe
+
+### Architecture
+- `utils.py` como punto de extension natural: el data engineer agrega helpers de extraccion ahi sin tocar el flujo principal de `scraper.py`
+- Consistencia en el paso de `logger`: todos los modulos del job (`scraper.py`, `process.py`) lo reciben como parametro
+
 ## [0.12.0] - 2026-03-12
 
 ### Added

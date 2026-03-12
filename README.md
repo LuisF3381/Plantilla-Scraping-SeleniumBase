@@ -23,6 +23,7 @@ ScrapeCraft/
 │   └── viviendas_adonde/              # Job de ejemplo
 │       ├── scraper.py                 # Logica de extraccion de datos
 │       ├── process.py                 # Transformacion de datos (raw → procesado)
+│       ├── utils.py                   # Funciones auxiliares de extraccion
 │       └── app_job.py                 # Flujo ETL del job + load_web_config()
 ├── config/
 │   ├── global_settings.py             # Config global: LOG_CONFIG, DATA_CONFIG
@@ -84,6 +85,7 @@ main.py (Dispatcher CLI)
 | `app_job.py` | Flujo ETL completo del job, expone `run(args)` como interfaz estandar |
 | `scraper.py` | Logica de extraccion: navegar, manejar CAPTCHA, extraer elementos |
 | `process.py` | Transformacion de datos entre el raw y el guardado final |
+| `utils.py` | Funciones auxiliares de extraccion (implementar y extender segun el job) |
 
 ## Instalacion
 
@@ -226,10 +228,12 @@ waits:
 
 1. Crear `src/<nombre>/app_job.py` con `def run(args)` que implementa el flujo ETL
 2. Crear `src/<nombre>/scraper.py` con la logica de extraccion
-3. Crear `src/<nombre>/process.py` con la logica de transformacion
-4. Crear `config/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG` y `RAW_CONFIG`
-5. Crear `config/<nombre>/web_config.yaml` con la URL y los selectores
-6. Crear las carpetas `output/<nombre>/` y `raw/<nombre>/`
+3. Crear `src/<nombre>/utils.py` con funciones auxiliares de extraccion
+4. Crear `src/<nombre>/process.py` con la logica de transformacion
+5. Crear `config/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG` y `RAW_CONFIG`
+6. Crear `config/<nombre>/web_config.yaml` con la URL y los selectores
+
+Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion.
 
 Luego ejecutar:
 
@@ -244,7 +248,7 @@ No es necesario modificar `main.py`.
 Implementa tu logica de transformacion dentro de `process()`:
 
 ```python
-def process(filename: str, extension: str, suffix: str, raw_config: dict) -> list[dict]:
+def process(filename: str, extension: str, suffix: str, raw_config: dict, logger=None) -> list[dict]:
     filepath = os.path.join(raw_config["raw_folder"], f"{filename}_{suffix}.{extension}")
     df = pd.read_csv(filepath)
 
@@ -281,8 +285,18 @@ def scrape(driver, web_config, logger) -> list[dict]:
 ### `src/<job>/process.py`
 
 ```python
-def process(filename, extension, suffix, raw_config) -> list[dict]:
+def process(filename, extension, suffix, raw_config, logger=None) -> list[dict]:
     """Lee el archivo raw y aplica transformaciones a los datos."""
+```
+
+### `src/<job>/utils.py`
+
+```python
+def safe_get_text(element, xpath, fallback="") -> str:
+    """Extrae el texto de un sub-elemento. Retorna fallback si no existe."""
+
+def parse_record(item, selectors, index) -> dict:
+    """Construye el diccionario de un registro a partir de un elemento contenedor."""
 ```
 
 ### `src/<job>/app_job.py`

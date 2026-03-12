@@ -20,6 +20,9 @@ def build_filepath(storage_config: dict, format: str) -> str:
     naming_mode: str = storage_config["naming_mode"]
     extension: str = format
 
+    # Garantizamos que la carpeta de salida existe
+    os.makedirs(output_folder, exist_ok=True)
+
     # Obtenemos la fecha actual
     now = datetime.now()
     date_str: str = now.strftime("%Y%m%d")
