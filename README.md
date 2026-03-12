@@ -17,16 +17,18 @@ ScrapeCraft/
 ├── src/                      # Codigo fuente
 │   ├── main.py               # Orquestacion principal
 │   ├── scraper.py            # Logica de extraccion de datos
+│   ├── process.py            # Transformacion de datos (raw → procesado)
 │   ├── storage.py            # Almacenamiento y exportacion
 │   ├── driver_config.py      # Configuracion del driver
 │   └── logger.py             # Sistema de logging
 ├── config/                   # Configuraciones
-│   ├── settings.py           # Config del driver, datos y logging
+│   ├── settings.py           # Config del driver, datos, logging y raw
 │   └── web_config.yaml       # URL, selectores y waits
 ├── tests/                    # Tests de validacion
 │   └── test_config.py
 ├── log/                      # Logs de ejecucion
-├── output/                   # Archivos generados
+├── raw/                      # Archivos de datos en bruto (intermedios)
+├── output/                   # Archivos generados (resultado final)
 ├── requirements.txt
 ├── CHANGELOG.md
 └── LICENSE
@@ -44,18 +46,24 @@ main.py (Orquestacion)
     ├── scraper.py
     │   └── scrape()          # Extrae datos de la web
     │
-    └── storage.py
-        ├── build_filepath()  # Construye rutas segun naming_mode
-        └── save_data()       # Exporta a CSV/JSON/XML/Excel
+    ├── storage.py
+    │   ├── save_raw()        # Guarda datos en bruto como CSV (raw/)
+    │   ├── cleanup_raw()     # Limpia raw/ segun politica de retencion
+    │   ├── build_filepath()  # Construye rutas segun naming_mode
+    │   └── save_data()       # Exporta a CSV/JSON/XML/Excel (output/)
+    │
+    └── process.py
+        └── process()         # Transforma datos: raw → procesado
 ```
 
 ### Modulos
 
 | Modulo | Responsabilidad |
 |--------|-----------------|
-| `main.py` | Orquestacion del flujo: cargar config, ejecutar scraping, guardar datos |
+| `main.py` | Orquestacion del flujo completo y del reprocesamiento |
 | `scraper.py` | Logica de extraccion: navegar, manejar CAPTCHA, extraer elementos |
-| `storage.py` | Persistencia: construir rutas, exportar en multiples formatos |
+| `process.py` | Transformacion de datos entre el raw y el guardado final |
+| `storage.py` | Persistencia: raw, cleanup, construir rutas, exportar en multiples formatos |
 | `driver_config.py` | Inicializacion del navegador con opciones anti-deteccion |
 | `logger.py` | Sistema de logging dual (archivo + consola) |
 
@@ -178,11 +186,82 @@ waits:
 ## Uso
 
 ```bash
-# Ejecutar scraping
+# Ejecutar flujo completo (scraping + procesamiento + guardado)
 python -m src.main
+
+# Reprocesar una ejecucion anterior sin volver a scrapear
+python -m src.main --reprocess <SUFFIX>
 
 # Ejecutar tests
 pytest tests/ -v
+```
+
+### Flujo completo
+
+Ejecuta todas las etapas en orden:
+
+```
+scrape() → save_raw() → del datos → process() → cleanup_raw() → save_data()
+```
+
+1. Extrae datos de la web y los guarda en `raw/` como CSV con sufijo timestamp
+2. Libera la memoria del raw y aplica las transformaciones definidas en `process.py`
+3. Limpia archivos antiguos de `raw/` segun la politica de retencion configurada
+4. Guarda el resultado final en `output/` en los formatos configurados
+
+### Reprocesamiento
+
+Cuando necesitas volver a aplicar `process.py` sobre datos ya scrapeados (por ejemplo, tras corregir la logica de transformacion) sin lanzar el navegador:
+
+```bash
+python -m src.main --reprocess 20260312_143052
+```
+
+El sufijo identifica la ejecucion y corresponde al timestamp del archivo en `raw/`:
+
+```
+raw/
+└── viviendas_20260312_143052.csv   ← sufijo: 20260312_143052
+```
+
+Para ver los sufijos disponibles, lista la carpeta `raw/`.
+
+## Configuracion
+
+### Raw (`config/settings.py`)
+
+Configura el almacenamiento intermedio y la politica de limpieza:
+
+```python
+RAW_CONFIG = {
+    "raw_folder": "raw",       # Carpeta de archivos raw
+    "filename": "viviendas",   # Nombre base del archivo
+    "format": "csv",           # Formato del raw (siempre csv)
+    "retention": {
+        "mode": "keep_last_n", # "keep_all" | "keep_last_n" | "keep_days"
+        "value": 5             # N archivos o N dias a conservar
+    }
+}
+```
+
+| Modo | Comportamiento |
+|------|----------------|
+| `keep_all` | Conserva todos los archivos raw (sin limpieza) |
+| `keep_last_n` | Conserva los ultimos N archivos por fecha de modificacion |
+| `keep_days` | Conserva los archivos de los ultimos N dias |
+
+### Procesamiento (`src/process.py`)
+
+Implementa tu logica de transformacion dentro de `process()`. La funcion recibe los parametros del archivo raw y devuelve una lista de diccionarios con los datos procesados:
+
+```python
+def process(filename: str, extension: str, suffix: str, raw_config: dict) -> list[dict]:
+    filepath = os.path.join(raw_config["raw_folder"], f"{filename}_{suffix}.{extension}")
+    df = pd.read_csv(filepath)
+
+    # --- Tu logica aqui ---
+
+    return df.to_dict(orient="records")
 ```
 
 ## API Reference
@@ -231,6 +310,41 @@ def build_filepath(storage_config, format) -> str:
     """
 ```
 
+### process.py
+
+```python
+def process(filename: str, extension: str, suffix: str, raw_config: dict) -> list[dict]:
+    """
+    Lee el archivo raw y aplica transformaciones a los datos.
+
+    Args:
+        filename:   Nombre base del archivo (ej: "viviendas")
+        extension:  Extension del archivo   (ej: "csv")
+        suffix:     Sufijo timestamp de la ejecucion (ej: "20260312_143052")
+        raw_config: Diccionario con configuracion del raw
+
+    Returns:
+        Lista de diccionarios con los datos procesados
+    """
+```
+
+### storage.py
+
+```python
+def save_raw(datos: list[dict], raw_config: dict) -> str:
+    """
+    Guarda los datos en bruto como CSV con sufijo timestamp.
+
+    Returns:
+        Sufijo timestamp generado (ej: "20260312_143052")
+    """
+
+def cleanup_raw(raw_config: dict) -> None:
+    """
+    Limpia archivos raw segun la politica de retencion configurada.
+    """
+```
+
 ### main.py
 
 ```python
@@ -248,15 +362,21 @@ def load_web_config(logger=None, path="config/web_config.yaml") -> dict:
 
 def main() -> None:
     """
-    Funcion principal que orquesta el proceso de scraping.
+    Orquesta el flujo completo o el reprocesamiento segun los argumentos CLI.
 
-    Flujo:
+    Flujo completo:
     1. Configura el logger
     2. Carga la configuracion web desde YAML
-    3. Inicializa el driver con las opciones de settings
-    4. Ejecuta el scraping
-    5. Guarda los datos
-    6. Cierra el driver
+    3. Inicializa el driver y ejecuta el scraping
+    4. Guarda los datos en bruto (raw/)
+    5. Aplica transformaciones con process()
+    6. Limpia archivos raw segun politica de retencion
+    7. Guarda el resultado final en output/
+
+    Flujo reprocess (--reprocess SUFFIX):
+    1. Configura el logger
+    2. Aplica transformaciones con process() sobre el raw indicado
+    3. Guarda el resultado final en output/
     """
 ```
 
@@ -289,6 +409,14 @@ def main() -> None:
 |------|-------------|
 | `test_settings_file_has_driver_config` | Verifica DRIVER_CONFIG |
 | `test_driver_instance_created_with_settings_file` | Test de instancia del driver |
+
+### RawConfig
+| Test | Descripcion |
+|------|-------------|
+| `test_settings_has_raw_config` | Verifica que RAW_CONFIG existe |
+| `test_raw_config_has_required_keys` | Valida claves requeridas |
+| `test_raw_config_format_is_csv` | Verifica que el formato raw es csv |
+| `test_raw_config_retention_mode_is_valid` | Valida el modo de retencion |
 
 ## Requisitos
 

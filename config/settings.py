@@ -93,3 +93,27 @@ STORAGE_CONFIG = {
     # Opciones disponibles: "csv", "json", "xml", "xlsx"
     "output_formats": ["csv", "json"]
 }
+
+# ============================================
+# CONFIGURACIÓN DE RAW (datos en bruto)
+# ============================================
+
+RAW_CONFIG = {
+    # Carpeta donde se guardan los archivos raw
+    "raw_folder": "raw",
+
+    # Nombre base del archivo raw (sin extension ni sufijo)
+    "filename": "viviendas",
+
+    # Formato del archivo raw (siempre csv)
+    "format": "csv",
+
+    # Politica de retencion de archivos raw:
+    # - "keep_all":    Conserva todos los archivos
+    # - "keep_last_n": Conserva los ultimos N archivos
+    # - "keep_days":   Conserva los archivos de los ultimos N dias
+    "retention": {
+        "mode": "keep_last_n",
+        "value": 5
+    }
+}

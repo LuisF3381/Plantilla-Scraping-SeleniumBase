@@ -101,3 +101,76 @@ def save_data(datos: list[dict], format: str, data_config: dict, storage_config:
 
     logger: logging.Logger = logging.getLogger("scrapecraft")
     logger.info(f"Datos guardados en {filepath} ({len(datos)} registros)")
+
+
+def save_raw(datos: list[dict], raw_config: dict) -> str:
+    """
+    Guarda los datos en bruto como CSV con sufijo timestamp.
+
+    Args:
+        datos: Lista de diccionarios con los datos a guardar
+        raw_config: Diccionario con configuracion del raw
+
+    Returns:
+        str: Sufijo timestamp generado (ej: "20260312_143052")
+    """
+    raw_folder: str = raw_config["raw_folder"]
+    filename: str = raw_config["filename"]
+
+    os.makedirs(raw_folder, exist_ok=True)
+
+    suffix: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath: str = os.path.join(raw_folder, f"{filename}_{suffix}.csv")
+
+    df: pd.DataFrame = pd.DataFrame(datos)
+    df.to_csv(filepath, index=False, encoding="utf-8")
+
+    logger: logging.Logger = logging.getLogger("scrapecraft")
+    logger.info(f"Raw guardado en {filepath} ({len(datos)} registros)")
+
+    return suffix
+
+
+def cleanup_raw(raw_config: dict) -> None:
+    """
+    Limpia archivos raw segun la politica de retencion configurada.
+
+    Args:
+        raw_config: Diccionario con configuracion del raw
+    """
+    raw_folder: str = raw_config["raw_folder"]
+    filename: str = raw_config["filename"]
+    retention: dict = raw_config.get("retention", {"mode": "keep_all"})
+    mode: str = retention.get("mode", "keep_all")
+
+    if mode == "keep_all":
+        return
+
+    if not os.path.isdir(raw_folder):
+        return
+
+    files: list[str] = sorted(
+        [
+            os.path.join(raw_folder, f)
+            for f in os.listdir(raw_folder)
+            if f.startswith(f"{filename}_") and f.endswith(".csv")
+        ],
+        key=os.path.getmtime
+    )
+
+    if mode == "keep_last_n":
+        value: int = retention["value"]
+        files_to_delete: list[str] = files[:-value] if len(files) > value else []
+
+    elif mode == "keep_days":
+        value: int = retention["value"]
+        cutoff: float = datetime.now().timestamp() - (value * 86400)
+        files_to_delete = [f for f in files if os.path.getmtime(f) < cutoff]
+
+    else:
+        raise ValueError(f"Modo de retencion no soportado: {mode}")
+
+    logger: logging.Logger = logging.getLogger("scrapecraft")
+    for filepath in files_to_delete:
+        os.remove(filepath)
+        logger.info(f"Raw eliminado: {filepath}")

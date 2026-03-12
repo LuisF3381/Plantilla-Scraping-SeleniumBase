@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.11.0] - 2026-03-12
+
+### Added
+- Modulo `src/process.py` con funcion `process()` para transformacion de datos entre scraping y guardado final
+- Funcion `save_raw()` en `storage.py`: guarda datos en bruto como CSV con sufijo timestamp, retorna el sufijo generado
+- Funcion `cleanup_raw()` en `storage.py`: aplica politica de retencion sobre la carpeta `raw/`
+- Configuracion `RAW_CONFIG` en `config/settings.py` con `raw_folder`, `filename`, `format` y `retention`
+- Soporte CLI con `argparse`: flag `--reprocess <SUFFIX>` para reprocesar un raw existente sin volver a scrapear
+- Carpeta `raw/` para almacenar archivos intermedios
+- Clase `TestRawConfig` en `tests/test_config.py` con 4 tests de validacion
+
+### Changed
+- `main.py` ampliado con dos flujos diferenciados:
+  - **Flujo completo**: scraping → save_raw → process → cleanup_raw → save_data
+  - **Flujo reprocess** (`--reprocess SUFFIX`): process → save_data
+- `main.py` libera memoria (`del datos`) entre save_raw y process para soportar datasets grandes
+
+### Architecture
+- Pipeline de datos en tres etapas: raw (CSV) → process (list[dict]) → output (formatos configurados)
+- `process()` recibe `filename`, `extension` y `suffix`; resuelve el path internamente desde `raw_config`
+- El sufijo timestamp es el identificador unico de cada ejecucion de scraping
+
 ## [0.10.0] - 2026-03-09
 
 ### Added

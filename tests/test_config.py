@@ -123,5 +123,34 @@ class TestDriverConfig:
             driver.quit()
 
 
+class TestRawConfig:
+    """Tests para validar RAW_CONFIG en settings.py"""
+
+    def test_settings_has_raw_config(self):
+        """Verifica que settings.py tiene RAW_CONFIG."""
+        assert hasattr(settings, 'RAW_CONFIG')
+        assert isinstance(settings.RAW_CONFIG, dict)
+        print("✓ settings.py contiene RAW_CONFIG")
+
+    def test_raw_config_has_required_keys(self):
+        """Verifica que RAW_CONFIG tiene las claves requeridas."""
+        required_keys = ["raw_folder", "filename", "format", "retention"]
+        for key in required_keys:
+            assert key in settings.RAW_CONFIG, f"Falta '{key}' en RAW_CONFIG"
+        print("✓ RAW_CONFIG tiene todas las claves requeridas")
+
+    def test_raw_config_format_is_csv(self):
+        """Verifica que el formato raw es csv."""
+        assert settings.RAW_CONFIG["format"] == "csv", "El formato raw debe ser 'csv'"
+        print("✓ Formato raw es csv")
+
+    def test_raw_config_retention_mode_is_valid(self):
+        """Verifica que el modo de retencion es valido."""
+        valid_modes = ["keep_all", "keep_last_n", "keep_days"]
+        mode = settings.RAW_CONFIG["retention"]["mode"]
+        assert mode in valid_modes, f"Modo invalido: {mode}. Debe ser uno de {valid_modes}"
+        print(f"✓ Modo de retencion valido: {mode}")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
