@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.21.0] - 2026-03-12
+
+### Changed
+- Comentario de `RAW_CONFIG["format"]` en `settings.py` actualizado de "siempre csv" a "csv | json | xml | xlsx" para reflejar que el formato es configurable
+- `DATA_CONFIG` documentado en README como unica fuente de verdad para parametros de formato, aplicada tanto al raw como al output
+
+### Documentation
+- Nueva tabla en README que muestra la relacion directa entre `RAW_CONFIG["format"]` y la entrada de `DATA_CONFIG` que se aplica en el pipeline completo (save_raw, load_raw, process.py)
+
+## [0.20.0] - 2026-03-12
+
+### Added
+- `_write_df()` y `_read_df()` en `storage.py`: funciones privadas que centralizan toda la logica de lectura y escritura por formato (csv, json, xml, xlsx), eliminando la duplicacion del bloque if/elif que existia en `save_data()`, `save_raw()` y `load_raw()`
+- Lineamiento **string-first**: todos los datos se persisten y se leen como `str` incondicionalmente
+  - `_write_df()` aplica `df.astype(str)` antes de escribir en cualquier formato
+  - `_read_df()` usa `dtype=str` al leer, evitando inferencia de tipos por parte de pandas
+
+### Architecture
+- Un unico punto de cambio para soportar un nuevo formato: agregar un bloque en `_write_df` y otro en `_read_df`
+- Separacion de responsabilidades reforzada: la capa raw actua como zona de aterrizaje de strings puros; la conversion de tipos es responsabilidad exclusiva de `process.py`
+- Beneficios del lineamiento string-first: preserva ceros a la izquierda, evita corte de decimales, mantiene valores danados o nulos tal cual llegan del scraper, elimina errores de inferencia de tipo en pandas
+
+## [0.19.0] - 2026-03-12
+
+### Changed
+- `save_raw()`, `load_raw()` y `cleanup_raw()` en `storage.py` ahora respetan `raw_config["format"]` para determinar el formato del archivo raw, en lugar de asumir siempre CSV
+- `process.py` ahora lee el raw segun `raw_config["format"]` usando `_read_df()`, eliminando el `pd.read_csv()` hardcodeado
+- El programador puede cambiar el formato del raw a cualquiera de los soportados (csv, json, xml, xlsx) modificando unicamente `RAW_CONFIG["format"]` en `settings.py`
+
+## [0.18.0] - 2026-03-12
+
+### Changed
+- `save_raw()`, `load_raw()` y `process.py` ahora reciben `data_config` y respetan `data_config["csv"]["encoding"]` y `data_config["csv"]["separator"]` al leer y escribir el raw, en lugar de tener valores hardcodeados
+- `DATA_CONFIG` en `global_settings.py` es ahora la unica fuente de verdad para encoding y separador en todas las operaciones CSV del pipeline (raw y output)
+
+## [0.17.0] - 2026-03-12
+
+### Fixed
+- `process.py` y `load_raw()` en `storage.py`: `pd.read_csv()` ahora especifica `encoding="utf-8"` para consistencia con `save_raw()`, que siempre guarda en UTF-8. Evita `UnicodeDecodeError` en Windows con texto en español (tildes, ñ)
+- `cleanup_raw()` en `storage.py`: ordenacion de archivos cambiada de `os.path.getmtime` a `os.path.basename`, usando el timestamp del nombre de archivo como criterio de orden en lugar de la fecha de modificacion del sistema de archivos, que podia ser alterada por copias o backups
+
 ## [0.16.0] - 2026-03-12
 
 ### Changed

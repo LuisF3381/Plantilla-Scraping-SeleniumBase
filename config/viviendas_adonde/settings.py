@@ -72,7 +72,8 @@ RAW_CONFIG = {
     # Nombre base del archivo raw (sin extension ni sufijo)
     "filename": "viviendas",
 
-    # Formato del archivo raw (siempre csv)
+    # Formato del archivo raw: csv | json | xml | xlsx
+    # Usa automaticamente la configuracion de DATA_CONFIG[format]
     "format": "csv",
 
     # Politica de retencion de archivos raw:

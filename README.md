@@ -167,7 +167,6 @@ LOG_CONFIG = {
 Cada job genera su propio archivo de log nombrado por proceso: `log/<job>_YYYYMMDD.log`. Multiples ejecuciones del mismo job en el mismo dia acumulan en el mismo archivo.
 
 ```python
-
 DATA_CONFIG = {
     "csv":  {"encoding": "utf-8", "separator": ";", "index": False},
     "json": {"indent": 2, "force_ascii": False, "orient": "records"},
@@ -175,6 +174,8 @@ DATA_CONFIG = {
     "xlsx": {"sheet_name": "Datos", "index": False}
 }
 ```
+
+`DATA_CONFIG` es la unica fuente de verdad para los parametros de cada formato. Se aplica tanto al output final (`save_data`) como al raw intermedio (`save_raw`, `load_raw`, `process.py`).
 
 ### Por job (`config/<job>/settings.py`)
 
@@ -200,7 +201,7 @@ STORAGE_CONFIG = {
 RAW_CONFIG = {
     "raw_folder": "raw/viviendas_adonde",
     "filename": "viviendas",
-    "format": "csv",
+    "format": "csv",             # csv | json | xml | xlsx
     "retention": {
         "mode": "keep_last_n",  # keep_all | keep_last_n | keep_days
         "value": 5
@@ -220,6 +221,17 @@ PIPELINE_CONFIG = {
 | `date_suffix` | `output/<job>/viviendas_20260130.csv` | Una ejecucion por dia |
 | `timestamp_suffix` | `output/<job>/viviendas_20260130_143052.csv` | Multiples ejecuciones por dia |
 | `date_folder` | `output/<job>/20260130/viviendas.csv` | Organizar por carpetas |
+
+#### Formato de raw (`format`)
+
+El campo `format` determina en que formato se persiste el raw intermedio. El pipeline usa automaticamente la configuracion de `DATA_CONFIG[format]` para leer y escribir.
+
+| Formato | Config aplicada | Archivo generado |
+|---------|-----------------|------------------|
+| `csv`  | `DATA_CONFIG["csv"]`  | `viviendas_20260312_143052.csv`  |
+| `json` | `DATA_CONFIG["json"]` | `viviendas_20260312_143052.json` |
+| `xml`  | `DATA_CONFIG["xml"]`  | `viviendas_20260312_143052.xml`  |
+| `xlsx` | `DATA_CONFIG["xlsx"]` | `viviendas_20260312_143052.xlsx` |
 
 #### Politicas de retencion de raw
 
@@ -266,17 +278,29 @@ No es necesario modificar `main.py`.
 
 ## Procesamiento (`src/<job>/process.py`)
 
-Implementa tu logica de transformacion dentro de `process()`:
+Implementa tu logica de transformacion dentro de `process()`. El raw llega con todas las columnas como `str` — convierte los tipos que necesites explicitamente:
 
 ```python
-def process(filename: str, extension: str, suffix: str, raw_config: dict) -> list[dict]:
+def process(filename: str, extension: str, suffix: str, raw_config: dict, data_config: dict) -> list[dict]:
     filepath = os.path.join(raw_config["raw_folder"], f"{filename}_{suffix}.{extension}")
-    df = pd.read_csv(filepath)
+    config = data_config[extension]
+    df = _read_df(filepath, extension, config)  # todas las columnas llegan como str
 
     # --- Tu logica aqui ---
+    # Convierte tipos donde sea necesario, por ejemplo:
+    # df["precio"] = df["precio"].str.replace(r"[^\d]", "", regex=True).astype(int)
 
     return df.to_dict(orient="records")
 ```
+
+### Lineamiento string-first
+
+Todos los datos se persisten y se leen como `str`, sin excepcion:
+
+- **Al escribir** (`save_raw`, `save_data`): se aplica `df.astype(str)` antes de guardar
+- **Al leer** (`load_raw`, `process.py`): se usa `dtype=str` para evitar inferencia de tipos
+
+Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danados se preserven exactamente como llegan del scraper. La conversion de tipos es responsabilidad exclusiva de `process.py`.
 
 ## API Reference
 
@@ -284,13 +308,13 @@ def process(filename: str, extension: str, suffix: str, raw_config: dict) -> lis
 
 ```python
 def save_data(datos, format, data_config, storage_config) -> None:
-    """Guarda los datos en el formato y ubicacion especificados."""
+    """Guarda los datos en el formato y ubicacion especificados. Persiste todo como str."""
 
-def save_raw(datos, raw_config) -> str:
-    """Guarda datos en bruto como CSV. Retorna el sufijo timestamp generado."""
+def save_raw(datos, raw_config, data_config) -> str:
+    """Guarda datos en bruto en el formato de raw_config["format"]. Retorna el sufijo timestamp. Persiste todo como str."""
 
-def load_raw(filename, extension, suffix, raw_config) -> list[dict]:
-    """Lee un raw existente y lo retorna como lista de dicts sin transformar."""
+def load_raw(filename, extension, suffix, raw_config, data_config) -> list[dict]:
+    """Lee un raw existente y lo retorna como lista de dicts sin transformar. Lee todo como str."""
 
 def cleanup_raw(raw_config) -> None:
     """Limpia archivos raw segun la politica de retencion configurada."""
@@ -309,8 +333,8 @@ def scrape(driver, web_config) -> list[dict]:
 ### `src/<job>/process.py`
 
 ```python
-def process(filename, extension, suffix, raw_config) -> list[dict]:
-    """Lee el archivo raw y aplica transformaciones a los datos."""
+def process(filename, extension, suffix, raw_config, data_config) -> list[dict]:
+    """Lee el archivo raw como str y aplica transformaciones y castings de tipo."""
 ```
 
 ### `src/<job>/utils.py`

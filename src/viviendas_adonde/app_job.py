@@ -65,7 +65,7 @@ def _run_full() -> list[dict]:
     finally:
         driver.quit()
 
-    suffix: str = save_raw(datos, settings.RAW_CONFIG)
+    suffix: str = save_raw(datos, settings.RAW_CONFIG, global_settings.DATA_CONFIG)
     del datos
 
     skip_process: bool = settings.PIPELINE_CONFIG.get("skip_process", False)
@@ -77,6 +77,7 @@ def _run_full() -> list[dict]:
             extension=settings.RAW_CONFIG["format"],
             suffix=suffix,
             raw_config=settings.RAW_CONFIG,
+            data_config=global_settings.DATA_CONFIG,
         )
     else:
         processed = process(
@@ -84,6 +85,7 @@ def _run_full() -> list[dict]:
             extension=settings.RAW_CONFIG["format"],
             suffix=suffix,
             raw_config=settings.RAW_CONFIG,
+            data_config=global_settings.DATA_CONFIG,
         )
 
     cleanup_raw(settings.RAW_CONFIG)
@@ -98,6 +100,7 @@ def _run_reprocess(suffix: str) -> list[dict]:
         extension=settings.RAW_CONFIG["format"],
         suffix=suffix,
         raw_config=settings.RAW_CONFIG,
+        data_config=global_settings.DATA_CONFIG,
     )
 
 
