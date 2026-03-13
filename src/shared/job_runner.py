@@ -52,7 +52,7 @@ def load_web_config(job_name: str) -> dict:
 # Flujos internos
 # ---------------------------------------------------------------------------
 
-def _run_full(scrape_fn, process_fn, settings, job_name: str) -> list[dict]:
+def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime) -> list[dict]:
     """Flujo completo: scraping → raw → (proceso opcional) → limpieza de raw."""
     logger.info("Iniciando scraper...")
 
@@ -67,7 +67,7 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str) -> list[dict]:
     if not datos:
         raise RuntimeError("El scraper no retorno datos. Verifica la URL, los selectores o posible bloqueo.")
 
-    suffix: str = save_raw(datos, settings.RAW_CONFIG, global_settings.DATA_CONFIG)
+    suffix: str = save_raw(datos, settings.RAW_CONFIG, global_settings.DATA_CONFIG, now)
     del datos
 
     skip_process: bool = settings.PIPELINE_CONFIG.get("skip_process", False)
@@ -108,10 +108,9 @@ def _run_reprocess(suffix: str, process_fn, settings) -> list[dict]:
     return process_fn(df)
 
 
-def _save_output(processed: list[dict], settings) -> None:
+def _save_output(processed: list[dict], settings, now: datetime) -> None:
     """Guarda los datos procesados en todos los formatos configurados."""
     output_formats = settings.STORAGE_CONFIG.get("output_formats", ["csv"])
-    now = datetime.now()
     for formato in output_formats:
         save_data(processed, formato, global_settings.DATA_CONFIG, settings.STORAGE_CONFIG, now)
     logger.info("Proceso finalizado")
@@ -134,13 +133,15 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
     """
     setup_logger(job_name, **global_settings.LOG_CONFIG)
 
+    now = datetime.now()
+
     try:
         if args.reprocess:
             processed = _run_reprocess(args.reprocess, process_fn, settings)
         else:
-            processed = _run_full(scrape_fn, process_fn, settings, job_name)
+            processed = _run_full(scrape_fn, process_fn, settings, job_name, now)
 
-        _save_output(processed, settings)
+        _save_output(processed, settings, now)
 
     except Exception as e:
         logger.error(f"Error durante la ejecucion: {e}", exc_info=True)

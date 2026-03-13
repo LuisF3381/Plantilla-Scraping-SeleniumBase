@@ -18,8 +18,10 @@ ScrapeCraft/
 │   ├── main.py                        # Dispatcher: lanza el job indicado por CLI
 │   ├── shared/                        # Modulos reutilizables entre todos los jobs
 │   │   ├── driver_config.py           # Configuracion del driver
+│   │   ├── job_runner.py              # Orquestacion ETL generica
 │   │   ├── logger.py                  # Sistema de logging
-│   │   └── storage.py                 # Almacenamiento y exportacion
+│   │   ├── storage.py                 # Almacenamiento y exportacion
+│   │   └── utils.py                   # Funciones auxiliares de extraccion
 │   ├── viviendas_adonde/              # Job: portal de alquiler de inmuebles
 │   │   ├── scraper.py
 │   │   ├── process.py
@@ -65,39 +67,43 @@ main.py (Dispatcher CLI)
     │
     └── importlib → src.<job>.app_job.run(args)
                         │
-                        ├── load_web_config()      # Carga config/<job>/web_config.yaml
-                        │
-                        ├── shared/driver_config.py
-                        │   └── DriverConfig        # Inicializa el browser
-                        │
-                        ├── scraper.py
-                        │   └── scrape()            # Extrae datos de la web
-                        │
-                        ├── shared/storage.py
-                        │   ├── save_raw()          # Guarda CSV en raw/<job>/
-                        │   ├── cleanup_raw()       # Aplica politica de retencion
-                        │   └── save_data()         # Exporta a output/<job>/
-                        │
-                        └── process.py
-                            └── process()           # Transforma raw → procesado
+                        └── shared/job_runner.run()     # Orquestacion ETL generica
+                                │
+                                ├── load_web_config()   # Carga config/<job>/web_config.yaml
+                                │
+                                ├── shared/driver_config.py
+                                │   └── DriverConfig    # Inicializa el browser
+                                │
+                                ├── scraper.py
+                                │   └── scrape()        # Extrae datos de la web
+                                │
+                                ├── shared/storage.py
+                                │   ├── save_raw()      # Guarda raw en raw/<job>/
+                                │   ├── cleanup_raw()   # Aplica politica de retencion
+                                │   └── save_data()     # Exporta a output/<job>/
+                                │
+                                └── process.py
+                                    └── process()       # Transforma raw → procesado
 ```
 
 ### Modulos compartidos (`src/shared/`)
 
 | Modulo | Responsabilidad |
 |--------|-----------------|
+| `job_runner.py` | Orquestacion ETL generica: `_run_full`, `_run_reprocess`, `_save_output`, `run` |
 | `storage.py` | Persistencia: raw, cleanup, construir rutas, exportar en multiples formatos |
 | `driver_config.py` | Inicializacion del navegador con opciones anti-deteccion |
 | `logger.py` | Sistema de logging dual (archivo + consola) |
+| `utils.py` | Funciones auxiliares de extraccion reutilizables: `safe_get_text`, `safe_get_attr` |
 
 ### Modulos por job (`src/<job>/`)
 
 | Modulo | Responsabilidad |
 |--------|-----------------|
-| `app_job.py` | Flujo ETL completo del job, expone `run(args)` como interfaz estandar |
+| `app_job.py` | Declara los imports del job (`scraper`, `process`, `settings`) y delega en `job_runner.run()` |
 | `scraper.py` | Logica de extraccion: navegar, manejar CAPTCHA, extraer elementos |
 | `process.py` | Transformacion de datos entre el raw y el guardado final |
-| `utils.py` | Funciones auxiliares de extraccion (implementar y extender segun el job) |
+| `utils.py` | `parse_record()` con logica especifica del job; importa `safe_get_text`/`safe_get_attr` de shared |
 
 ## Instalacion
 
@@ -273,15 +279,28 @@ waits:
 
 ## Agregar un nuevo proceso
 
-1. Crear `src/<nombre>/app_job.py` con `def run(args)` que implementa el flujo ETL
+1. Crear `src/<nombre>/app_job.py` con las tres importaciones del job y la llamada al runner:
+
+```python
+from pathlib import Path
+from src.<nombre>.scraper import scrape
+from src.<nombre>.process import process
+from config.<nombre> import settings
+from src.shared.job_runner import run as _run_job
+
+_JOB_NAME = Path(__file__).parent.name
+
+def run(args):
+    _run_job(args, scrape, process, settings, _JOB_NAME)
+```
+
 2. Crear `src/<nombre>/scraper.py` con la logica de extraccion
-3. Crear `src/<nombre>/utils.py` con funciones auxiliares de extraccion
+3. Crear `src/<nombre>/utils.py` con `parse_record()` (importa `safe_get_text`/`safe_get_attr` desde `src.shared.utils`)
 4. Crear `src/<nombre>/process.py` con la logica de transformacion
 5. Crear `config/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG` y `PIPELINE_CONFIG`
 6. Crear `config/<nombre>/web_config.yaml` con la URL y los selectores
 
-Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion.
-`WEB_CONFIG_PATH` en `app_job.py` se resuelve automaticamente desde el nombre de la carpeta del job — no requiere modificacion manual.
+Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion. No es necesario modificar `main.py` ni ningun otro modulo del framework.
 
 Luego ejecutar:
 
@@ -319,16 +338,34 @@ Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danad
 
 ## API Reference
 
+### `src/shared/job_runner.py`
+
+```python
+def load_web_config(job_name: str) -> dict:
+    """Carga la configuracion de la web desde config/<job_name>/web_config.yaml."""
+
+def run(args, scrape_fn, process_fn, settings, job_name: str) -> None:
+    """
+    Punto de entrada generico para cualquier job. Llamado desde app_job.run().
+
+    Flujo completo:    scrape → save_raw → load_raw → process(df) → cleanup_raw → save_data
+    Sin proceso:       scrape → save_raw → load_raw → cleanup_raw → save_data
+    Flujo reprocess:   load_raw → process(df) → save_data
+    """
+```
+
 ### `src/shared/storage.py`
 
 ```python
 def save_data(datos, format, data_config, storage_config, now=None) -> None:
     """Guarda los datos en el formato y ubicacion especificados. Persiste todo como str (None → "").
-    now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor a todas las
-    llamadas de un run garantiza timestamps coherentes en modo timestamp_suffix."""
+    now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor a save_raw()
+    garantiza timestamps coherentes entre el raw y el output de una misma ejecucion."""
 
-def save_raw(datos, raw_config, data_config) -> str:
-    """Guarda datos en bruto en el formato de raw_config["format"]. Retorna el sufijo timestamp. Persiste todo como str (None → "")."""
+def save_raw(datos, raw_config, data_config, now=None) -> str:
+    """Guarda datos en bruto en el formato de raw_config["format"]. Retorna el sufijo timestamp.
+    now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor que a save_data()
+    garantiza coherencia de timestamps entre raw y output."""
 
 def load_raw(filename, extension, suffix, raw_config, data_config) -> list[dict]:
     """Lee un raw existente y lo retorna como lista de dicts sin transformar. Lee todo como str."""
@@ -339,6 +376,17 @@ def cleanup_raw(raw_config) -> None:
 def build_filepath(storage_config, format, now=None) -> str:
     """Construye la ruta del archivo segun el modo de nombrado configurado.
     now: datetime opcional; si se omite se usa datetime.now()."""
+```
+
+### `src/shared/utils.py`
+
+```python
+def safe_get_text(element, xpath, fallback="") -> str:
+    """Extrae el texto de un sub-elemento. Retorna fallback si no existe."""
+
+def safe_get_attr(element, xpath, attr, fallback="") -> str:
+    """Extrae el valor de un atributo HTML de un sub-elemento. Retorna fallback si no existe.
+    Util cuando el dato esta en un atributo (ej: @title, @class, @href) en lugar del texto."""
 ```
 
 ### `src/<job>/scraper.py`
@@ -358,31 +406,18 @@ def process(df: pd.DataFrame) -> list[dict]:
 ### `src/<job>/utils.py`
 
 ```python
-def safe_get_text(element, xpath, fallback="") -> str:
-    """Extrae el texto de un sub-elemento. Retorna fallback si no existe."""
-
-def safe_get_attr(element, xpath, attr, fallback="") -> str:
-    """Extrae el valor de un atributo HTML de un sub-elemento. Retorna fallback si no existe.
-    Util cuando el dato esta en un atributo (ej: @title, @class, @href) en lugar del texto."""
-
 def parse_record(item, selectors, index) -> dict:
-    """Construye el diccionario de un registro a partir de un elemento contenedor."""
+    """Construye el diccionario de un registro a partir de un elemento contenedor.
+    Implementa la logica especifica del job para cada campo (texto, atributo, etc.).
+    Importa safe_get_text y safe_get_attr desde src.shared.utils."""
 ```
 
 ### `src/<job>/app_job.py`
 
 ```python
-def load_web_config() -> dict:
-    """Carga la configuracion de la web desde el archivo YAML del job."""
-
 def run(args: argparse.Namespace) -> None:
-    """
-    Punto de entrada del job. Interfaz estandar requerida por el dispatcher.
-
-    Flujo completo:    scrape → save_raw → load_raw → process(df) → cleanup_raw → save_data
-    Sin proceso:       scrape → save_raw → load_raw → cleanup_raw → save_data
-    Flujo reprocess:   load_raw → process(df) → save_data
-    """
+    """Punto de entrada del job. Interfaz estandar requerida por el dispatcher.
+    Declara los imports del job y delega en job_runner.run()."""
 ```
 
 ## Tests

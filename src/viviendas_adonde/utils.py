@@ -1,25 +1,4 @@
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
-
-
-def safe_get_text(element, xpath: str, fallback: str = "") -> str:
-    """
-    Extrae el texto de un sub-elemento dado su XPath relativo.
-    Retorna `fallback` si el elemento no existe en lugar de lanzar una excepcion.
-
-    Args:
-        element:  Elemento padre desde el que se busca (WebElement de Selenium)
-        xpath:    XPath relativo al elemento padre
-        fallback: Valor a retornar si el elemento no se encuentra (por defecto "")
-
-    Returns:
-        Texto del elemento limpio, o `fallback` si no existe
-    """
-    try:
-        text = element.find_element(By.XPATH, xpath).text
-        return text.replace("\n", " | ").strip()
-    except NoSuchElementException:
-        return fallback
+from src.shared.utils import safe_get_text, safe_get_attr  # noqa: F401
 
 
 def parse_record(item, selectors: dict, index: int) -> dict:

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.24.0] - 2026-03-13
+
+### Fixed
+- `src/shared/logger.py`: el guard `if logger.handlers: return` reemplazado por un loop que cierra y elimina todos los handlers existentes antes de agregar los nuevos — con el guard anterior, el segundo job ejecutado en el mismo proceso heredaba los handlers del primero (incluido su `FileHandler`), escribiendo sus logs en el archivo del job anterior en lugar del propio
+- `src/shared/storage.py` `save_raw()`: nuevo parametro opcional `now: datetime | None = None` — antes generaba su propio `datetime.now()` internamente, desincronizado del `now` usado en `save_data()`; ahora recibe el mismo instante que el output, garantizando coherencia de timestamps entre el archivo raw y los archivos de salida de una misma ejecucion
+
+### Changed
+- `src/shared/job_runner.py` (nuevo): toda la logica comun de `app_job.py` extraida a este modulo compartido — `load_web_config()`, `_run_full()`, `_run_reprocess()`, `_save_output()` y `run()`; el `now` se captura una unica vez en `run()` y se propaga a `_run_full()` (para `save_raw`) y a `_save_output()` (para `save_data`)
+- `src/<job>/app_job.py`: reducido de 149 lineas a 11 — solo declara los tres imports especificos del job (`scraper`, `process`, `settings`) y delega en `job_runner.run()`; el flujo ETL ya no requiere duplicacion al añadir nuevos jobs
+- `src/shared/utils.py` (nuevo): `safe_get_text()` y `safe_get_attr()` movidas aqui desde los `utils.py` de cada job, eliminando la duplicacion; cada job importa las funciones compartidas y conserva su propio `parse_record()` con la logica especifica de extraccion
+- `src/<job>/utils.py`: reducido a solo `parse_record()` mas el import desde `src.shared.utils`; los tests y scrapers existentes no requieren cambios (las funciones siguen exportandose desde el namespace del job)
+- `tests/<job>/test_config.py`: import de `load_web_config` actualizado de `src.<job>.app_job` a `src.shared.job_runner` con wrapper local que inyecta el `job_name` del job correspondiente
+
+### Architecture
+- Un nuevo job requiere exactamente 5 archivos: `app_job.py` (11 lineas), `scraper.py`, `process.py`, `utils.py` y `config/<job>/settings.py` + `web_config.yaml` — sin tocar ningun modulo del framework
+- La logica ETL vive en un unico lugar (`job_runner.py`): un bug fix o mejora al pipeline se aplica automaticamente a todos los jobs existentes y futuros
+- `safe_get_text` y `safe_get_attr` tienen una sola definicion en el proyecto; cualquier mejora a estas funciones se propaga a todos los jobs
+
 ## [0.23.0] - 2026-03-13
 
 ### Added

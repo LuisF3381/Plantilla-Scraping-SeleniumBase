@@ -102,7 +102,7 @@ def save_data(datos: list[dict], format: str, data_config: dict, storage_config:
     logger.info(f"Datos guardados en {filepath} ({len(datos)} registros)")
 
 
-def save_raw(datos: list[dict], raw_config: dict, data_config: dict) -> str:
+def save_raw(datos: list[dict], raw_config: dict, data_config: dict, now: datetime | None = None) -> str:
     """
     Guarda los datos en bruto con sufijo timestamp en el formato indicado por raw_config.
 
@@ -110,6 +110,8 @@ def save_raw(datos: list[dict], raw_config: dict, data_config: dict) -> str:
         datos:       Lista de diccionarios con los datos a guardar
         raw_config:  Diccionario con configuracion del raw
         data_config: Diccionario con configuraciones de formato (DATA_CONFIG)
+        now:         Momento de referencia para el sufijo. Si es None se usa datetime.now().
+                     Pasar el mismo valor que a save_data() garantiza coherencia entre raw y output.
 
     Returns:
         str: Sufijo timestamp generado (ej: "20260312_143052")
@@ -120,7 +122,8 @@ def save_raw(datos: list[dict], raw_config: dict, data_config: dict) -> str:
 
     os.makedirs(raw_folder, exist_ok=True)
 
-    suffix: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    now = now or datetime.now()
+    suffix: str = now.strftime("%Y%m%d_%H%M%S")
     filepath: str = os.path.join(raw_folder, f"{filename}_{suffix}.{format}")
 
     _write_df(pd.DataFrame(datos), filepath, format, data_config[format])
