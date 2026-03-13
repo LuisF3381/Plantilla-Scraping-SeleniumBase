@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.23.0] - 2026-03-13
+
+### Added
+- Nuevo job `books_to_scrape`: scraper para `http://books.toscrape.com/` que extrae Titulo, Precio y Rating de la primera pagina (~20 libros)
+- `src/books_to_scrape/utils.py`: nueva funcion `safe_get_attr(element, xpath, attr, fallback)` para extraer atributos HTML en lugar de texto, necesaria para el titulo (atributo `@title` del `<a>`) y el rating (atributo `@class` del `<p>`)
+- `src/books_to_scrape/process.py`: transformaciones especificas del job:
+  - `Precio_GBP`: extrae el valor numerico del precio (ej: `"£51.77"` → `51.77` como float)
+  - `Rating_Numerico`: mapea el rating textual a entero (ej: `"star-rating Three"` → `3`)
+- `tests/books_to_scrape/test_config.py`: suite de 28 tests que incluye `TestProcess` y `TestUtils` — clases no presentes en viviendas_adonde — con tests unitarios para las transformaciones de `process.py` y los helpers de `utils.py` usando mocks de WebElement
+- `config/books_to_scrape/settings.py`: `undetected=False` (sitio de practica sin anti-bot), salida en CSV y JSON
+- `config/books_to_scrape/web_config.yaml`: URL, selectores XPath para container, Titulo, Precio y Rating; `after_load=1s` al ser sitio estatico
+- Carpeta `output/books_to_scrape/` creada para almacenar los archivos de salida
+
+### Changed
+- `src/books_to_scrape/scraper.py`: usa `driver.open()` en lugar de `uc_open_with_reconnect()` ya que el driver no esta en modo UC (`undetected=False`)
+- `src/books_to_scrape/utils.py`: `parse_record()` con logica especifica por campo: extrae `@title` para Titulo, `@class` para Rating y `.text` directo para Precio
+
+### Fixed
+- `src/books_to_scrape/process.py`: `select_dtypes(include="object")` corregido a `select_dtypes(include=["object", "str"])` para evitar `Pandas4Warning` de deprecacion
+
 ## [0.22.0] - 2026-03-13
 
 ### Fixed

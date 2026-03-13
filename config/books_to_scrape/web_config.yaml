@@ -1,0 +1,38 @@
+# =============================================================================
+# URL de la pagina a scrapear
+# =============================================================================
+url: "http://books.toscrape.com/"
+
+# =============================================================================
+# Selectores XPath
+#
+# - container: OBLIGATORIO. XPath absoluto al elemento que se repite una vez
+#              por registro (ej: la tarjeta de un producto, un anuncio, etc.).
+#              Es la palabra reservada del sistema — no renombrar.
+#
+# - Resto de campos: XPath relativo al container (deben empezar con .//).
+#                    El nombre del campo se convierte en columna en el output.
+#                    Si el elemento no existe en un registro, se guarda "".
+#
+# Notas especificas para books.toscrape.com:
+#   - Titulo:  se extrae del atributo @title del <a>, no del texto (que esta truncado)
+#   - Precio:  texto del elemento, incluye simbolo de libra (ej: "£51.77")
+#   - Rating:  se extrae del atributo @class del <p> (ej: "star-rating Three")
+# =============================================================================
+xpath_selectors:
+  container: '//article[contains(@class,"product_pod")]'
+  Titulo:    './/h3/a'
+  Precio:    './/p[@class="price_color"]'
+  Rating:    './/p[contains(@class,"star-rating")]'
+
+# =============================================================================
+# Tiempos de espera
+#
+# - reconnect_attempts: Intentos de reconexion si la pagina no carga.
+#
+# - after_load: Segundos de espera tras la carga de la pagina.
+#               books.toscrape.com es estatico, con 1 segundo es suficiente.
+# =============================================================================
+waits:
+  reconnect_attempts: 2
+  after_load: 1

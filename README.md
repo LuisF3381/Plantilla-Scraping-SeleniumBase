@@ -20,25 +20,37 @@ ScrapeCraft/
 │   │   ├── driver_config.py           # Configuracion del driver
 │   │   ├── logger.py                  # Sistema de logging
 │   │   └── storage.py                 # Almacenamiento y exportacion
-│   └── viviendas_adonde/              # Job de ejemplo
-│       ├── scraper.py                 # Logica de extraccion de datos
-│       ├── process.py                 # Transformacion de datos (raw → procesado)
-│       ├── utils.py                   # Funciones auxiliares de extraccion
-│       └── app_job.py                 # Flujo ETL del job + load_web_config()
+│   ├── viviendas_adonde/              # Job: portal de alquiler de inmuebles
+│   │   ├── scraper.py
+│   │   ├── process.py
+│   │   ├── utils.py
+│   │   └── app_job.py
+│   └── books_to_scrape/               # Job: catalogo de libros (sitio de practica)
+│       ├── scraper.py
+│       ├── process.py
+│       ├── utils.py
+│       └── app_job.py
 ├── config/
 │   ├── global_settings.py             # Config global: LOG_CONFIG, DATA_CONFIG
-│   └── viviendas_adonde/              # Config especifica del job
-│       ├── settings.py                # DRIVER_CONFIG, STORAGE_CONFIG, RAW_CONFIG
-│       └── web_config.yaml            # URL, selectores XPath y waits
+│   ├── viviendas_adonde/
+│   │   ├── settings.py
+│   │   └── web_config.yaml
+│   └── books_to_scrape/
+│       ├── settings.py
+│       └── web_config.yaml
 ├── tests/
 │   ├── test_global.py                 # Tests de configuracion global
-│   └── viviendas_adonde/              # Tests especificos del job
+│   ├── viviendas_adonde/
+│   │   └── test_config.py
+│   └── books_to_scrape/
 │       └── test_config.py
 ├── log/                               # Logs de ejecucion (compartido)
 ├── output/
-│   └── viviendas_adonde/              # Archivos de salida del job
+│   ├── viviendas_adonde/
+│   └── books_to_scrape/
 ├── raw/
-│   └── viviendas_adonde/              # Archivos intermedios del job
+│   ├── viviendas_adonde/
+│   └── books_to_scrape/
 ├── requirements.txt
 ├── CHANGELOG.md
 └── LICENSE
@@ -103,9 +115,11 @@ python -m src.main --list
 
 # Ejecutar un job completo (scraping + procesamiento + guardado)
 python -m src.main --job viviendas_adonde
+python -m src.main --job books_to_scrape
 
 # Reprocesar sin volver a scrapear (usa un raw existente)
 python -m src.main --job viviendas_adonde --reprocess 20260312_143052
+python -m src.main --job books_to_scrape --reprocess 20260313_142546
 
 # Ejecutar todos los tests
 pytest tests/ -v
@@ -115,6 +129,7 @@ pytest tests/test_global.py -v
 
 # Ejecutar tests de un job especifico
 pytest tests/viviendas_adonde/ -v
+pytest tests/books_to_scrape/ -v
 ```
 
 ### Flujo completo (`skip_process=False`)
@@ -346,6 +361,10 @@ def process(df: pd.DataFrame) -> list[dict]:
 def safe_get_text(element, xpath, fallback="") -> str:
     """Extrae el texto de un sub-elemento. Retorna fallback si no existe."""
 
+def safe_get_attr(element, xpath, attr, fallback="") -> str:
+    """Extrae el valor de un atributo HTML de un sub-elemento. Retorna fallback si no existe.
+    Util cuando el dato esta en un atributo (ej: @title, @class, @href) en lugar del texto."""
+
 def parse_record(item, selectors, index) -> dict:
     """Construye el diccionario de un registro a partir de un elemento contenedor."""
 ```
@@ -397,6 +416,39 @@ def run(args: argparse.Namespace) -> None:
 | `TestRawConfig` | `test_raw_config_has_required_keys` | Valida claves requeridas |
 | `TestRawConfig` | `test_raw_config_format_is_valid` | Verifica que el formato raw es uno de los soportados |
 | `TestRawConfig` | `test_raw_config_retention_mode_is_valid` | Valida modo de retencion |
+
+### `tests/books_to_scrape/test_config.py`
+
+| Clase | Test | Descripcion |
+|-------|------|-------------|
+| `TestWebConfig` | `test_web_config_file_exists` | Verifica existencia del YAML |
+| `TestWebConfig` | `test_web_config_has_required_keys` | Valida claves requeridas |
+| `TestWebConfig` | `test_url_format_is_valid` | Valida formato URL |
+| `TestWebConfig` | `test_xpath_selectors_has_container` | Verifica selector container obligatorio |
+| `TestWebConfig` | `test_xpath_selectors_format` | Valida formato XPath de todos los selectores |
+| `TestWebConfig` | `test_xpath_selectors_has_expected_fields` | Verifica campos Titulo, Precio y Rating |
+| `TestWebConfig` | `test_waits_are_positive_numbers` | Valida waits numericos |
+| `TestStorageConfig` | `test_settings_has_storage_config` | Verifica STORAGE_CONFIG existe |
+| `TestStorageConfig` | `test_storage_config_has_required_keys` | Valida claves requeridas |
+| `TestStorageConfig` | `test_storage_config_naming_mode_is_valid` | Valida naming_mode |
+| `TestStorageConfig` | `test_storage_config_output_folder_exists` | Verifica carpeta output |
+| `TestStorageConfig` | `test_storage_config_output_formats_are_valid` | Valida formatos de salida |
+| `TestDriverConfig` | `test_settings_file_has_driver_config` | Verifica DRIVER_CONFIG existe |
+| `TestDriverConfig` | `test_driver_instance_created_with_settings_file` | Test de instancia del driver |
+| `TestRawConfig` | `test_settings_has_raw_config` | Verifica RAW_CONFIG existe |
+| `TestRawConfig` | `test_raw_config_has_required_keys` | Valida claves requeridas |
+| `TestRawConfig` | `test_raw_config_format_is_valid` | Verifica que el formato raw es uno de los soportados |
+| `TestRawConfig` | `test_raw_config_retention_mode_is_valid` | Valida modo de retencion |
+| `TestProcess` | `test_process_returns_list_of_dicts` | Verifica el tipo de retorno |
+| `TestProcess` | `test_process_precio_gbp_conversion` | Valida conversion de "£51.77" a 51.77 |
+| `TestProcess` | `test_process_rating_numerico_conversion` | Valida mapeo de "star-rating X" a entero 1-5 |
+| `TestProcess` | `test_process_precio_empty_returns_none` | Precio vacio produce None en Precio_GBP |
+| `TestProcess` | `test_process_preserves_all_records` | process() no descarta ni duplica registros |
+| `TestUtils` | `test_safe_get_text_returns_text` | safe_get_text devuelve texto limpio |
+| `TestUtils` | `test_safe_get_text_fallback_on_missing` | safe_get_text retorna fallback si no existe |
+| `TestUtils` | `test_safe_get_attr_returns_attribute` | safe_get_attr devuelve el atributo HTML |
+| `TestUtils` | `test_safe_get_attr_fallback_on_missing` | safe_get_attr retorna fallback si no existe |
+| `TestUtils` | `test_parse_record_includes_numero` | parse_record incluye Numero y omite container |
 
 ## Requisitos
 
