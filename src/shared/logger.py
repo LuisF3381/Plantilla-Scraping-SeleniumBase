@@ -20,6 +20,7 @@ def setup_logger(job_name: str, log_folder: str = "log", level: str = "INFO") ->
 
     logger: logging.Logger = logging.getLogger("src")
     logger.setLevel(getattr(logging, level.upper()))
+    logger.propagate = False
 
     for handler in logger.handlers[:]:
         handler.close()

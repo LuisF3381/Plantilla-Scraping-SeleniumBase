@@ -30,9 +30,9 @@ def _read_df(filepath: str, format: str, config: dict) -> pd.DataFrame:
     if format == "csv":
         df = pd.read_csv(filepath, encoding=config.get("encoding", "utf-8"), sep=config.get("separator", ","), dtype=str)
     elif format == "json":
-        df = pd.read_json(filepath, orient=config.get("orient", "records"), dtype=str)
+        df = pd.read_json(filepath, orient=config.get("orient", "records"), dtype=str).astype(str)
     elif format == "xml":
-        df = pd.read_xml(filepath, dtype=str)
+        df = pd.read_xml(filepath, dtype=str, encoding=config.get("encoding", "utf-8"))
     elif format == "xlsx":
         df = pd.read_excel(filepath, dtype=str)
     else:
@@ -120,6 +120,9 @@ def save_raw(datos: list[dict], raw_config: dict, data_config: dict, now: dateti
     filename: str = raw_config["filename"]
     format: str = raw_config["format"]
 
+    if format not in data_config:
+        raise ValueError(f"Formato raw no soportado: {format}. Disponibles: {list(data_config.keys())}")
+
     os.makedirs(raw_folder, exist_ok=True)
 
     now = now or datetime.now()
@@ -170,11 +173,15 @@ def cleanup_raw(raw_config: dict) -> None:
     if not os.path.isdir(raw_folder):
         return
 
-    def _extract_timestamp(filepath: str) -> str:
-        """Extrae el sufijo YYYYMMDD_HHMMSS del nombre del archivo para ordenar cronologicamente."""
-        stem = os.path.splitext(os.path.basename(filepath))[0]
-        parts = stem.rsplit("_", 2)
-        return f"{parts[-2]}_{parts[-1]}" if len(parts) >= 3 else stem
+    def _parse_timestamp(filepath: str) -> datetime | None:
+        """Extrae el sufijo YYYYMMDD_HHMMSS del nombre del archivo y lo convierte a datetime."""
+        try:
+            stem = os.path.splitext(os.path.basename(filepath))[0]
+            ts_str = "_".join(stem.split("_")[-2:])
+            return datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+        except ValueError:
+            logger.warning(f"Archivo con nombre inesperado en raw, ignorando: {os.path.basename(filepath)}")
+            return None
 
     files: list[str] = sorted(
         [
@@ -182,7 +189,7 @@ def cleanup_raw(raw_config: dict) -> None:
             for f in os.listdir(raw_folder)
             if f.startswith(f"{filename}_") and f.endswith(f".{format}")
         ],
-        key=_extract_timestamp
+        key=lambda f: _parse_timestamp(f) or datetime.min
     )
 
     if mode == "keep_last_n":
@@ -191,16 +198,6 @@ def cleanup_raw(raw_config: dict) -> None:
     elif mode == "keep_days":
         value: int = retention["value"]
         cutoff: datetime = datetime.now() - timedelta(days=value)
-
-        def _parse_timestamp(filepath: str) -> datetime | None:
-            try:
-                stem = os.path.splitext(os.path.basename(filepath))[0]  # "viviendas_20260312_143052"
-                ts_str = "_".join(stem.split("_")[-2:])                  # "20260312_143052"
-                return datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
-            except ValueError:
-                logger.warning(f"Archivo con nombre inesperado en raw, ignorando: {os.path.basename(filepath)}")
-                return None
-
         files_to_delete = [f for f in files if (ts := _parse_timestamp(f)) is not None and ts < cutoff]
     else:
         raise ValueError(f"Modo de retencion no soportado: {mode}")

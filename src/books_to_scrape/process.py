@@ -28,6 +28,8 @@ def process(df: pd.DataFrame) -> list[dict]:
         list[dict]: Lista de diccionarios con los datos procesados
     """
 
+    df = df.copy()
+
     # Limpieza de espacios en columnas de texto
     for col in df.select_dtypes(include=["object", "str"]).columns:
         df[col] = df[col].str.strip()

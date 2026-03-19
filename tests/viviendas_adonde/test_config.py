@@ -4,10 +4,11 @@ import re
 from urllib.parse import urlparse
 from src.shared.driver_config import DriverConfig
 from src.shared.job_runner import load_web_config as _load_web_config
+from config.viviendas_adonde import settings
+
 
 def load_web_config():
     return _load_web_config("viviendas_adonde")
-from config.viviendas_adonde import settings
 
 
 class TestWebConfig:
@@ -80,11 +81,11 @@ class TestStorageConfig:
         assert mode in valid_modes, f"Modo inválido: {mode}. Debe ser uno de {valid_modes}"
         print(f"[OK] Modo de nombrado válido: {mode}")
 
-    def test_storage_config_output_folder_exists(self):
-        """Verifica que la carpeta de salida existe."""
+    def test_storage_config_output_folder_is_valid_path(self):
+        """Verifica que output_folder es una ruta valida no vacia."""
         folder = settings.STORAGE_CONFIG["output_folder"]
-        assert os.path.isdir(folder), f"Carpeta de salida no existe: {folder}"
-        print(f"[OK] Carpeta de salida existe: {folder}")
+        assert isinstance(folder, str) and folder.strip(), "output_folder debe ser una cadena no vacia"
+        print(f"[OK] output_folder configurado: {folder}")
 
 
 class TestDriverConfig:

@@ -444,7 +444,7 @@ def run(args: argparse.Namespace) -> None:
 | `TestStorageConfig` | `test_settings_has_storage_config` | Verifica STORAGE_CONFIG existe |
 | `TestStorageConfig` | `test_storage_config_has_required_keys` | Valida claves requeridas |
 | `TestStorageConfig` | `test_storage_config_naming_mode_is_valid` | Valida naming_mode |
-| `TestStorageConfig` | `test_storage_config_output_folder_exists` | Verifica carpeta output |
+| `TestStorageConfig` | `test_storage_config_output_folder_is_valid_path` | Verifica que output_folder es una cadena no vacia |
 | `TestDriverConfig` | `test_settings_file_has_driver_config` | Verifica DRIVER_CONFIG existe |
 | `TestDriverConfig` | `test_driver_instance_created_with_settings_file` | Test de instancia del driver |
 | `TestRawConfig` | `test_settings_has_raw_config` | Verifica RAW_CONFIG existe |
@@ -466,7 +466,7 @@ def run(args: argparse.Namespace) -> None:
 | `TestStorageConfig` | `test_settings_has_storage_config` | Verifica STORAGE_CONFIG existe |
 | `TestStorageConfig` | `test_storage_config_has_required_keys` | Valida claves requeridas |
 | `TestStorageConfig` | `test_storage_config_naming_mode_is_valid` | Valida naming_mode |
-| `TestStorageConfig` | `test_storage_config_output_folder_exists` | Verifica carpeta output |
+| `TestStorageConfig` | `test_storage_config_output_folder_is_valid_path` | Verifica que output_folder es una cadena no vacia |
 | `TestStorageConfig` | `test_storage_config_output_formats_are_valid` | Valida formatos de salida |
 | `TestDriverConfig` | `test_settings_file_has_driver_config` | Verifica DRIVER_CONFIG existe |
 | `TestDriverConfig` | `test_driver_instance_created_with_settings_file` | Test de instancia del driver |

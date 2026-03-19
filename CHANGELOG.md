@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.26.0] - 2026-03-19
+
+### Fixed
+- `src/books_to_scrape/process.py` y `src/viviendas_adonde/process.py`: `select_dtypes(include=["object"])` revertido a `include=["object", "str"]` — en pandas 4, `StringDtype` ya no queda capturado bajo `"object"` solo; con la forma explicita se procesan ambos tipos sin warning de deprecacion
+- `src/shared/storage.py` `save_raw()`: añadida validacion de formato antes de acceder a `data_config[format]` — sin ella, un formato invalido en `raw_config` lanzaba `KeyError` sin mensaje descriptivo, a diferencia de `save_data()` que ya validaba correctamente con `ValueError`
+- `tests/books_to_scrape/test_config.py` y `tests/viviendas_adonde/test_config.py`: `test_storage_config_output_folder_exists` renombrado a `test_storage_config_output_folder_is_valid_path` y reescrito para validar que el valor es una cadena no vacia en lugar de verificar existencia en disco — la carpeta de salida se crea en la primera ejecucion del pipeline (`build_filepath` hace `os.makedirs`), por lo que el test fallaba siempre en un repo recien clonado
+- `src/shared/job_runner.py` `_run_full()`: `cleanup_raw()` movido a bloque `finally` — si `process_fn` lanzaba una excepcion, la limpieza se omitia y los archivos raw se acumulaban indefinidamente ignorando la politica de retencion configurada
+- `tests/books_to_scrape/test_config.py` y `tests/viviendas_adonde/test_config.py`: imports movidos al bloque de imports del modulo — estaban colocados despues de definiciones de funciones, violando PEP 8 y confundiendo linters y formatters
+
+### Changed
+- `src/books_to_scrape/process.py` y `src/viviendas_adonde/process.py`: `df = df.copy()` añadido al inicio de `process()` — la funcion mutaba el DataFrame de entrada directamente, violando el contrato de funcion pura que garantiza que el caller no vera cambios inesperados en el objeto que paso
+- `src/shared/storage.py` `_read_df()` formato `json`: `.astype(str)` aplicado tras `pd.read_json()` — el parametro `dtype=str` en `read_json` no es confiable en todas las versiones de pandas (columnas numericas pueden persistir como `int64` o `float64`), rompiendo el lineamiento string-first en el raw
+- `src/shared/storage.py` `_read_df()` formato `xml`: añadido `encoding=config.get("encoding", "utf-8")` a `pd.read_xml()` — el encoding global de `DATA_CONFIG` se respetaba para CSV y JSON pero se ignoraba para XML
+- `src/shared/logger.py`: `logger.propagate = False` añadido tras configurar el logger `"src"` — sin esto, si el root logger de Python tenia handlers activos (por ejemplo en entornos de CI o con `logging.basicConfig()`), los mensajes aparecian duplicados en consola
+- `src/shared/storage.py` `cleanup_raw()`: funciones `_extract_timestamp` y `_parse_timestamp` unificadas en una sola `_parse_timestamp` — ambas extraian el sufijo `YYYYMMDD_HHMMSS` del nombre del archivo usando estrategias distintas (`rsplit` vs `split[-2:]`); ahora existe un unico helper y el ordenamiento usa `key=lambda f: _parse_timestamp(f) or datetime.min`
+
 ## [0.25.0] - 2026-03-14
 
 ### Fixed

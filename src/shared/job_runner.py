@@ -80,13 +80,15 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime) -> 
 
     skip_process: bool = settings.PIPELINE_CONFIG.get("skip_process", False)
 
-    if skip_process:
-        logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
-        processed = raw_records
-    else:
-        processed = process_fn(pd.DataFrame(raw_records))
+    try:
+        if skip_process:
+            logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
+            processed = raw_records
+        else:
+            processed = process_fn(pd.DataFrame(raw_records))
+    finally:
+        cleanup_raw(settings.RAW_CONFIG)
 
-    cleanup_raw(settings.RAW_CONFIG)
     return processed
 
 
