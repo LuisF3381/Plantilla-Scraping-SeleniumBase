@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 
-def setup_logger(job_name: str, log_folder: str = "log", level: str = "INFO") -> None:
+def setup_logger(job_name: str, now: datetime, log_folder: str = "log", level: str = "INFO") -> None:
     """
     Configura el logger raiz "src" con salida a archivo y consola.
     Debe llamarse una sola vez al inicio del proceso desde app_job.py.
@@ -11,12 +11,13 @@ def setup_logger(job_name: str, log_folder: str = "log", level: str = "INFO") ->
 
     Args:
         job_name:   Nombre del job (se usa para nombrar el archivo de log)
+        now:        Timestamp de inicio del job (mismo que se usa para raw y output)
         log_folder: Carpeta donde se guardan los logs
         level:      Nivel de logging (DEBUG, INFO, WARNING, ERROR)
     """
     os.makedirs(log_folder, exist_ok=True)
 
-    log_file: str = os.path.join(log_folder, f"{job_name}_{datetime.now():%Y%m%d_%H%M%S}.log")
+    log_file: str = os.path.join(log_folder, f"{job_name}_{now:%Y%m%d_%H%M%S}.log")
 
     logger: logging.Logger = logging.getLogger("src")
     logger.setLevel(getattr(logging, level.upper()))

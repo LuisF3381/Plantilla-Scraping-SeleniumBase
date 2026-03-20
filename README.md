@@ -375,10 +375,11 @@ def process(df: pd.DataFrame) -> list[dict]:
 
 ### Lineamiento string-first
 
-Todos los datos se persisten y se leen como `str`, sin excepcion:
+El raw intermedio se persiste siempre como `str`. El output final preserva los tipos que `process.py` asigne:
 
-- **Al escribir** (`save_raw`, `save_data`): se aplica `df.fillna("").astype(str)` antes de guardar — los `NaN` reales se rellenan con `""` antes de convertir a string, preservando el literal `"nan"` como dato valido en campos de texto
-- **Al leer** (`load_raw`): se usa `dtype=str` para evitar inferencia de tipos
+- **Al escribir raw** (`save_raw`): se aplica `df.fillna("").astype(str)` — los `NaN` reales se rellenan con `""` antes de convertir a string, preservando el literal `"nan"` como dato valido en campos de texto
+- **Al leer** (`load_raw`): se usa `dtype=str` para evitar inferencia de tipos — todas las columnas llegan a `process()` como `str`
+- **Al escribir output** (`save_data`): se preservan los tipos que `process.py` asigno (`float`, `int`, `datetime`, etc.) — en JSON los numeros se guardan como numeros, en XLSX las celdas mantienen su tipo
 
 Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danados se preserven exactamente como llegan del scraper. La conversion de tipos es responsabilidad exclusiva de `process.py`.
 
@@ -404,8 +405,8 @@ def run(args, scrape_fn, process_fn, settings, job_name: str) -> None:
 
 ```python
 def save_data(datos, format, data_config, storage_config, now=None) -> None:
-    """Guarda los datos en el formato y ubicacion especificados. Persiste todo como str (None → "").
-    now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor a save_raw()
+    """Guarda los datos en el formato y ubicacion especificados preservando los tipos de cada campo.
+    now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor que a save_raw()
     garantiza timestamps coherentes entre el raw y el output de una misma ejecucion."""
 
 def save_raw(datos, raw_config, data_config, now=None) -> str:

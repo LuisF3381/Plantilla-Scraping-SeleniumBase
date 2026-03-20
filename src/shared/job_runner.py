@@ -127,15 +127,13 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, par
 
     skip_process: bool = settings.PIPELINE_CONFIG.get("skip_process", False)
 
-    try:
-        if skip_process:
-            logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
-            processed = raw_records
-        else:
-            processed = process_fn(pd.DataFrame(raw_records))
-    finally:
-        cleanup_raw(settings.RAW_CONFIG)
+    if skip_process:
+        logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
+        processed = raw_records
+    else:
+        processed = process_fn(pd.DataFrame(raw_records))
 
+    cleanup_raw(settings.RAW_CONFIG)
     return processed
 
 
@@ -175,9 +173,8 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
         settings:   Modulo de configuracion del job
         job_name:   Nombre del job (nombre de la carpeta en src/)
     """
-    setup_logger(job_name, **global_settings.LOG_CONFIG)
-
     now = datetime.now()
+    setup_logger(job_name, now, **global_settings.LOG_CONFIG)
 
     if args.params:
         params = _parse_params(args.params)

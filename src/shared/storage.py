@@ -10,9 +10,17 @@ logger = logging.getLogger(__name__)
 # Helpers privados de lectura / escritura (no usar directamente)
 # ---------------------------------------------------------------------------
 
-def _write_df(df: pd.DataFrame, filepath: str, format: str, config: dict) -> None:
-    """Escribe un DataFrame en el formato indicado usando la config correspondiente."""
-    df = df.fillna("").astype(str)
+def _write_df(df: pd.DataFrame, filepath: str, format: str, config: dict, stringify: bool = False) -> None:
+    """
+    Escribe un DataFrame en el formato indicado usando la config correspondiente.
+
+    Args:
+        stringify: Si True, convierte todas las columnas a string antes de escribir.
+                   Usar True para raw (preserva exactitud de datos brutos).
+                   Usar False para output (preserva tipos numericos, fechas, etc.).
+    """
+    if stringify:
+        df = df.fillna("").astype(str)
     if format == "csv":
         df.to_csv(filepath, index=False, encoding=config.get("encoding", "utf-8"), sep=config.get("separator", ","))
     elif format == "json":
@@ -129,7 +137,7 @@ def save_raw(datos: list[dict], raw_config: dict, data_config: dict, now: dateti
     suffix: str = now.strftime("%Y%m%d_%H%M%S")
     filepath: str = os.path.join(raw_folder, f"{filename}_{suffix}.{format}")
 
-    _write_df(pd.DataFrame(datos), filepath, format, data_config[format])
+    _write_df(pd.DataFrame(datos), filepath, format, data_config[format], stringify=True)
     logger.info(f"Raw guardado en {filepath} ({len(datos)} registros)")
 
     return suffix

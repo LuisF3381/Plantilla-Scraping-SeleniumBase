@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.29.0] - 2026-03-19
+
+### Fixed
+- `src/shared/storage.py` `_write_df()`: añadido parametro `stringify: bool = False` — antes la funcion aplicaba `df.fillna("").astype(str)` incondicionalmente, convirtiendo a string todos los valores incluyendo los del output final; ahora solo `save_raw()` llama con `stringify=True`, mientras `save_data()` usa el default `False` y preserva los tipos que `process.py` asigno (`float`, `int`, etc.); en JSON, `Precio_GBP` se guarda como `51.77` en lugar de `"51.77"` y en XLSX las celdas numericas mantienen su tipo
+- `src/shared/job_runner.py` `_run_full()`: `cleanup_raw()` movido fuera del bloque `finally` — cuando `process_fn()` lanzaba una excepcion, el bloque `finally` eliminaba el archivo raw antes de que el usuario pudiera investigar o usar `--reprocess`; ahora `cleanup_raw()` solo se ejecuta si `process()` termina correctamente, preservando el raw ante fallos para permitir reprocesamiento sin re-scrapear
+- `src/shared/logger.py` `setup_logger()`: el timestamp del log ahora es el mismo `now` que se usa para nombrar los archivos raw y output — antes `setup_logger` capturaba su propio `datetime.now()` internamente, generando una diferencia de segundos respecto al timestamp de los archivos en ejecuciones lentas; el `now` se captura una unica vez en `run()` y se propaga a `setup_logger`, `save_raw` y `save_data`
+
+### Changed
+- `src/shared/job_runner.py` `run()`: `now = datetime.now()` movido antes de `setup_logger()` — `now` es ahora el unico timestamp de referencia de toda la ejecucion y se pasa explicitamente a `setup_logger(job_name, now, **LOG_CONFIG)`
+- `src/shared/logger.py` `setup_logger()`: nueva firma `setup_logger(job_name, now, log_folder, level)` — `now: datetime` es el segundo parametro posicional; el log de cada ejecucion (`<job>_YYYYMMDD_HHMMSS.log`) comparte timestamp exacto con los archivos raw y output generados en esa misma ejecucion
+
 ## [0.28.0] - 2026-03-19
 
 ### Added
