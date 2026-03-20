@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.33.0] - 2026-03-19
+
+### Removed
+- `src/<job>/app_job.py`: eliminado de todos los jobs — era boilerplate puro de 12 lineas identicas por job; `main.py` ahora importa directamente `scraper`, `process` y `settings` de cada job sin intermediario
+
+### Changed
+- `src/main.py` `get_available_jobs()`: el marker de descubrimiento cambia de `app_job.py` a `scraper.py` — cualquier carpeta en `src/` con un `scraper.py` es reconocida como job valido
+- `src/main.py` `_load_job_module()`: reemplazada por `_load_job_parts(job_name)` que retorna la tupla `(scrape_fn, process_fn, settings)` e importa los tres modulos directamente; `main.py` pasa las partes a `job_runner.run()` sin pasar por `app_job`
+- `src/main.py`: eliminados `import os` e `import types`; modulo unificado a `pathlib.Path` exclusivamente
+- `src/shared/job_runner.py` `_run_full()`: eliminado el ciclo `save_raw → load_raw` — tras guardar el raw, la normalizacion string-first se aplica en memoria con `pd.DataFrame(datos).fillna("").astype(str)`; `load_raw` queda exclusivo para el flujo `--reprocess`; se elimina un ciclo completo de I/O a disco en cada ejecucion normal
+
 ## [0.32.0] - 2026-03-19
 
 ### Changed

@@ -1,24 +1,27 @@
 import argparse
 import importlib
-import os
-import types
 import yaml
+from pathlib import Path
+from src.shared import job_runner
 
 
 def get_available_jobs() -> list[str]:
-    """Escanea src/ y retorna los jobs disponibles (carpetas con app_job.py)."""
-    src_path = os.path.dirname(__file__)
+    """Escanea src/ y retorna los jobs disponibles (carpetas con scraper.py)."""
+    src_path = Path(__file__).parent
     return [
         entry.name
-        for entry in os.scandir(src_path)
-        if entry.is_dir() and os.path.isfile(os.path.join(entry.path, "app_job.py"))
+        for entry in src_path.iterdir()
+        if entry.is_dir() and (entry / "scraper.py").is_file()
     ]
 
 
-def _load_job_module(job_name: str) -> types.ModuleType:
-    """Importa y retorna el modulo app_job del job indicado."""
+def _load_job_parts(job_name: str) -> tuple:
+    """Importa y retorna (scrape_fn, process_fn, settings) del job indicado."""
     try:
-        return importlib.import_module(f"src.{job_name}.app_job")
+        scraper  = importlib.import_module(f"src.{job_name}.scraper")
+        process  = importlib.import_module(f"src.{job_name}.process")
+        settings = importlib.import_module(f"src.{job_name}.settings")
+        return scraper.scrape, process.process, settings
     except ModuleNotFoundError:
         available = ", ".join(get_available_jobs()) or "ninguno"
         print(f"Error: job '{job_name}' no encontrado. Jobs disponibles: {available}")
@@ -52,8 +55,8 @@ def _run_series(job_entries: list[dict]) -> None:
         print(f"\n[{i}/{total}] Iniciando job: {job_name}", flush=True)
 
         try:
-            module = _load_job_module(job_name)
-            module.run(_make_args(job_name, params=params))
+            scrape_fn, process_fn, settings = _load_job_parts(job_name)
+            job_runner.run(_make_args(job_name, params=params), scrape_fn, process_fn, settings, job_name)
         except SystemExit:
             raise
         except Exception as e:
@@ -76,11 +79,12 @@ def _load_pipeline(path: str) -> list[dict]:
             params: "categoria=mystery"   # opcional
           - name: viviendas_adonde
     """
-    if not os.path.isfile(path):
+    pipeline_path = Path(path)
+    if not pipeline_path.is_file():
         print(f"Error: pipeline '{path}' no encontrado.")
         raise SystemExit(1)
 
-    with open(path, "r", encoding="utf-8") as f:
+    with pipeline_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     if "jobs" not in data or not isinstance(data["jobs"], list):
@@ -90,7 +94,7 @@ def _load_pipeline(path: str) -> list[dict]:
     entries = []
     for item in data["jobs"]:
         if "name" not in item:
-            print(f"Error: cada job del pipeline debe tener un campo 'name'.")
+            print("Error: cada job del pipeline debe tener un campo 'name'.")
             raise SystemExit(1)
         entries.append({"name": item["name"], "params": item.get("params")})
 
@@ -153,7 +157,7 @@ def main() -> None:
             for job in jobs:
                 print(f"  - {job}")
         else:
-            print("No se encontraron jobs. Crea uno en src/<nombre>/app_job.py")
+            print("No se encontraron jobs. Crea uno en src/<nombre>/scraper.py")
         raise SystemExit(0)
 
     # --reprocess y --params son exclusivos de --job
@@ -165,8 +169,8 @@ def main() -> None:
     # --- Despacho segun modo ---
 
     if args.job:
-        module = _load_job_module(args.job)
-        module.run(args)
+        scrape_fn, process_fn, settings = _load_job_parts(args.job)
+        job_runner.run(args, scrape_fn, process_fn, settings, args.job)
 
     elif args.jobs:
         job_names = [j.strip() for j in args.jobs.split(",") if j.strip()]
@@ -177,7 +181,7 @@ def main() -> None:
     elif args.all:
         job_names = sorted(get_available_jobs())
         if not job_names:
-            print("No se encontraron jobs. Crea uno en src/<nombre>/app_job.py")
+            print("No se encontraron jobs. Crea uno en src/<nombre>/scraper.py")
             raise SystemExit(0)
         print(f"Jobs a ejecutar: {', '.join(job_names)}")
         _run_series([{"name": name} for name in job_names])

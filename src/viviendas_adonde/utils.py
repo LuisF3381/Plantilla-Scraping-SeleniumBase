@@ -1,4 +1,4 @@
-from src.shared.utils import safe_get_text, safe_get_attr  # noqa: F401
+from src.shared.utils import safe_get_text, safe_get_attr
 
 
 def parse_record(item, selectors: dict, index: int) -> dict:

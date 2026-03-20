@@ -27,15 +27,13 @@ ScrapeCraft/
 │   │   ├── web_config.yaml            # URL, selectores XPath y waits
 │   │   ├── scraper.py
 │   │   ├── process.py
-│   │   ├── utils.py
-│   │   └── app_job.py
+│   │   └── utils.py
 │   └── books_to_scrape/               # Job: catalogo de libros (sitio de practica)
 │       ├── settings.py
 │       ├── web_config.yaml
 │       ├── scraper.py
 │       ├── process.py
-│       ├── utils.py
-│       └── app_job.py
+│       └── utils.py
 ├── config/
 │   ├── global_settings.py             # Config global: LOG_CONFIG, DATA_CONFIG
 │   └── pipelines/
@@ -68,7 +66,7 @@ El proyecto sigue un patron **multi-job dispatcher**:
 ```
 main.py (Dispatcher CLI)
     │
-    └── importlib → src.<job>.app_job.run(args)
+    └── importlib → src.<job>.{scraper, process, settings}
                         │
                         └── shared/job_runner.run()     # Orquestacion ETL generica
                                 │
@@ -103,7 +101,6 @@ main.py (Dispatcher CLI)
 
 | Modulo | Responsabilidad |
 |--------|-----------------|
-| `app_job.py` | Declara los imports del job (`scraper`, `process`, `settings`) y delega en `job_runner.run()` |
 | `scraper.py` | Logica de extraccion: navegar, manejar CAPTCHA, extraer elementos |
 | `process.py` | Transformacion de datos entre el raw y el guardado final |
 | `utils.py` | `parse_record()` con logica especifica del job; importa `safe_get_text`/`safe_get_attr` de shared |
@@ -192,18 +189,18 @@ Jobs con error: viviendas_adonde
 ### Flujo completo (`skip_process=False`)
 
 ```
-scrape() → save_raw() → del datos → process() → cleanup_raw() → save_data()
+scrape() → save_raw() → normalize_in_memory() → process() → cleanup_raw() → save_data()
 ```
 
 1. Extrae datos de la web y los guarda en `raw/<job>/` como CSV con sufijo timestamp
-2. Libera la memoria del raw y aplica las transformaciones definidas en `process.py`
+2. Normaliza el raw en memoria (`fillna("").astype(str)`) y aplica las transformaciones definidas en `process.py`
 3. Limpia archivos antiguos de `raw/<job>/` segun la politica de retencion configurada
 4. Guarda el resultado final en `output/<job>/` en los formatos configurados
 
 ### Flujo sin procesamiento (`skip_process=True`)
 
 ```
-scrape() → save_raw() → del datos → cleanup_raw() → save_data()
+scrape() → save_raw() → normalize_in_memory() → cleanup_raw() → save_data()
 ```
 
 Util cuando la web ya devuelve datos normalizados y no se requiere transformacion. Se activa con `SKIP_PROCESS = True` en `settings.py`.
@@ -370,28 +367,13 @@ waits:
 
 ## Agregar un nuevo proceso
 
-1. Crear `src/<nombre>/app_job.py` con las tres importaciones del job y la llamada al runner:
+1. Crear `src/<nombre>/scraper.py` con la logica de extraccion
+2. Crear `src/<nombre>/utils.py` con `parse_record()` (importa `safe_get_text`/`safe_get_attr` desde `src.shared.utils`)
+3. Crear `src/<nombre>/process.py` con la logica de transformacion
+4. Crear `src/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG` y `SKIP_PROCESS`
+5. Crear `src/<nombre>/web_config.yaml` con la URL y los selectores
 
-```python
-from pathlib import Path
-from src.<nombre>.scraper import scrape
-from src.<nombre>.process import process
-from src.<nombre> import settings
-from src.shared.job_runner import run as _run_job
-
-_JOB_NAME = Path(__file__).parent.name
-
-def run(args):
-    _run_job(args, scrape, process, settings, _JOB_NAME)
-```
-
-2. Crear `src/<nombre>/scraper.py` con la logica de extraccion
-3. Crear `src/<nombre>/utils.py` con `parse_record()` (importa `safe_get_text`/`safe_get_attr` desde `src.shared.utils`)
-4. Crear `src/<nombre>/process.py` con la logica de transformacion
-5. Crear `src/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG` y `SKIP_PROCESS`
-6. Crear `src/<nombre>/web_config.yaml` con la URL y los selectores
-
-Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion. No es necesario modificar `main.py` ni ningun otro modulo del framework.
+Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion. No es necesario modificar `main.py` ni ningun otro modulo del framework — el dispatcher descubre el job automaticamente por la presencia de `scraper.py`.
 
 Luego ejecutar:
 
@@ -416,14 +398,14 @@ def process(df: pd.DataFrame) -> list[dict]:
     return df.to_dict(orient="records")
 ```
 
-`app_job.py` se encarga de cargar el raw y construir el DataFrame antes de llamar a `process()`. El modulo no tiene dependencias de I/O — solo recibe datos y devuelve datos.
+`job_runner.py` se encarga de normalizar el raw y construir el DataFrame antes de llamar a `process()`. El modulo no tiene dependencias de I/O — solo recibe datos y devuelve datos.
 
 ### Lineamiento string-first
 
 El raw intermedio se persiste siempre como `str`. El output final preserva los tipos que `process.py` asigne:
 
 - **Al escribir raw** (`save_raw`): se aplica `df.fillna("").astype(str)` — los `NaN` reales se rellenan con `""` antes de convertir a string, preservando el literal `"nan"` como dato valido en campos de texto
-- **Al leer** (`load_raw`): se usa `dtype=str` para evitar inferencia de tipos — todas las columnas llegan a `process()` como `str`
+- **Normalizacion en memoria**: tras `save_raw`, el raw se normaliza en memoria con `pd.DataFrame(datos).fillna("").astype(str)` — todas las columnas llegan a `process()` como `str` sin un ciclo de lectura a disco adicional; `load_raw` queda exclusivo para el flujo `--reprocess`
 - **Al escribir output** (`save_data`): se preservan los tipos que `process.py` asigno (`float`, `int`, `datetime`, etc.) — en JSON los numeros se guardan como numeros, en XLSX las celdas mantienen su tipo
 
 Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danados se preserven exactamente como llegan del scraper. La conversion de tipos es responsabilidad exclusiva de `process.py`.
@@ -438,10 +420,10 @@ def load_web_config(job_name: str) -> dict:
 
 def run(args, scrape_fn, process_fn, settings, job_name: str) -> None:
     """
-    Punto de entrada generico para cualquier job. Llamado desde app_job.run().
+    Punto de entrada generico para cualquier job. Llamado directamente desde main.py.
 
-    Flujo completo:    scrape → save_raw → load_raw → process(df) → cleanup_raw → save_data
-    Sin proceso:       scrape → save_raw → load_raw → cleanup_raw → save_data
+    Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → cleanup_raw → save_data
+    Sin proceso:       scrape → save_raw → normalize_in_memory → cleanup_raw → save_data
     Flujo reprocess:   load_raw → process(df) → save_data
     """
 ```
@@ -506,14 +488,6 @@ def parse_record(item, selectors, index) -> dict:
     """Construye el diccionario de un registro a partir de un elemento contenedor.
     Implementa la logica especifica del job para cada campo (texto, atributo, etc.).
     Importa safe_get_text y safe_get_attr desde src.shared.utils."""
-```
-
-### `src/<job>/app_job.py`
-
-```python
-def run(args: argparse.Namespace) -> None:
-    """Punto de entrada del job. Interfaz estandar requerida por el dispatcher.
-    Declara los imports del job y delega en job_runner.run()."""
 ```
 
 ## Tests

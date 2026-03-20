@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from src.shared.driver_config import create_driver
 from src.shared.logger import setup_logger
-from src.shared.storage import save_data, save_raw, cleanup_raw, load_raw
+from src.shared.storage import save_data, save_raw, cleanup_raw, load_raw  # load_raw solo para --reprocess
 from config import global_settings
 
 logger = logging.getLogger(__name__)
@@ -112,22 +112,17 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, par
     if not datos:
         raise RuntimeError("El scraper no retorno datos. Verifica la URL, los selectores o posible bloqueo.")
 
-    suffix: str = save_raw(datos, settings.RAW_CONFIG, global_settings.DATA_CONFIG, now)
+    save_raw(datos, settings.RAW_CONFIG, global_settings.DATA_CONFIG, now)
+
+    # Normalizacion string-first en memoria (equivalente al ciclo save→load CSV)
+    df_raw = pd.DataFrame(datos).fillna("").astype(str)
     del datos
 
-    raw_records: list[dict] = load_raw(
-        suffix=suffix,
-        raw_config=settings.RAW_CONFIG,
-        data_config=global_settings.DATA_CONFIG,
-    )
-
-    skip_process: bool = settings.SKIP_PROCESS
-
-    if skip_process:
+    if settings.SKIP_PROCESS:
         logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
-        processed = raw_records
+        processed = df_raw.to_dict(orient="records")
     else:
-        processed = process_fn(pd.DataFrame(raw_records))
+        processed = process_fn(df_raw)
 
     cleanup_raw(settings.RAW_CONFIG)
     return processed
