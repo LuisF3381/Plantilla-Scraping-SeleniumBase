@@ -1,0 +1,32 @@
+# =============================================================================
+# Pipeline con consolidacion: ejecucion diaria + merge final
+#
+# Ejecutar con:
+#   python -m src.main --pipeline config/pipelines/diario_consolidado.yaml
+#
+# Flujo:
+#   1. Ejecuta books_to_scrape  → output/books_to_scrape/books_<fecha>.csv
+#   2. Ejecuta viviendas_adonde → output/viviendas_adonde/viviendas_<fecha>.csv
+#   3. Si ambos exitosos → consolida en output/consolidados/consolidado_<fecha>.csv
+# =============================================================================
+
+name: diario_consolidado
+description: "Scraping diario con consolidacion final de todos los outputs"
+
+jobs:
+  - name: books_to_scrape
+    params:
+      categoria: mystery
+      pagina: 1
+
+  - name: viviendas_adonde
+    params:
+      pais: peru
+      max_paginas: 5
+      solo_nuevos: true
+
+consolidate:
+  enabled: true
+  module: ejemplo         # src/consolidadores/ejemplo.py
+  format: csv             # ambos jobs incluyen "csv" en output_formats
+  params: {}

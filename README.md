@@ -22,6 +22,8 @@ ScrapeCraft/
 │   │   ├── logger.py                  # Sistema de logging
 │   │   ├── storage.py                 # Almacenamiento y exportacion
 │   │   └── utils.py                   # Funciones auxiliares de extraccion
+│   ├── consolidadores/                # Modulos de consolidacion (uno por pipeline)
+│   │   └── ejemplo.py                 # Consolidador de ejemplo
 │   ├── viviendas_adonde/              # Job: portal de alquiler de inmuebles
 │   │   ├── settings.py                # Config del job: DRIVER, STORAGE, RAW, SKIP_PROCESS
 │   │   ├── web_config.yaml            # URL, selectores y waits
@@ -37,15 +39,18 @@ ScrapeCraft/
 ├── config/
 │   ├── global_settings.py             # Config global: LOG_CONFIG, DATA_CONFIG
 │   └── pipelines/
-│       └── diario.yaml                # Ejemplo de pipeline multi-job
+│       ├── diario.yaml                # Ejemplo de pipeline multi-job
+│       └── diario_consolidado.yaml    # Ejemplo de pipeline con consolidacion
 ├── tests/
 │   ├── test_global.py                 # Tests de configuracion global
+│   ├── test_pipelines.py              # Tests de todos los pipelines (auto-discovery)
 │   ├── viviendas_adonde/
 │   │   └── test_viviendas_adonde.py
 │   └── books_to_scrape/
 │       └── test_books_to_scrape.py
 ├── log/                               # Logs de ejecucion (compartido)
 ├── output/
+│   ├── consolidados/                  # Output de consolidaciones
 │   ├── viviendas_adonde/
 │   └── books_to_scrape/
 ├── raw/
@@ -89,10 +94,18 @@ main.py (Dispatcher CLI)
 | Modulo | Responsabilidad |
 |--------|-----------------|
 | `job_runner.py` | Orquestacion ETL generica: `_run_full`, `_run_reprocess`, `_save_output`, `run` |
-| `storage.py` | Persistencia: raw, cleanup, construir rutas, exportar en multiples formatos |
+| `storage.py` | Persistencia: raw, cleanup, construir rutas, exportar en multiples formatos, cargar outputs para consolidacion |
 | `driver_config.py` | `create_driver(config)`: inicializa el navegador con opciones anti-deteccion |
 | `logger.py` | Sistema de logging dual (archivo + consola) |
 | `utils.py` | Funciones auxiliares de extraccion reutilizables: `safe_get_text`, `safe_get_attr` |
+
+### Modulos consolidadores (`src/consolidadores/`)
+
+| Modulo | Responsabilidad |
+|--------|-----------------|
+| `ejemplo.py` | Consolidador de ejemplo: combina todos los jobs por concatenacion con columna `_fuente` |
+
+Cada consolidador define su propio `STORAGE_CONFIG` y una funcion `consolidate(job_dataframes, params)`. El framework gestiona el I/O — el consolidador solo implementa logica.
 
 ### Modulos por job (`src/<job>/`)
 
@@ -123,9 +136,13 @@ python -m src.main --job books_to_scrape --reprocess 20260313_142546
 # --- Ejecucion en serie ---
 python -m src.main --pipeline config/pipelines/diario.yaml
 
+# --- Ejecucion en serie con consolidacion ---
+python -m src.main --pipeline config/pipelines/diario_consolidado.yaml
+
 # --- Tests ---
 pytest tests/ -v
 pytest tests/test_global.py -v
+pytest tests/test_pipelines.py -v
 pytest tests/books_to_scrape/ -v
 pytest tests/viviendas_adonde/ -v
 ```
@@ -137,7 +154,7 @@ ScrapeCraft tiene dos modos de ejecucion mutuamente excluyentes:
 | Modo | Comando | Uso |
 |------|---------|-----|
 | Job individual | `--job nombre` | Un job, con `--reprocess` opcional |
-| Pipeline YAML | `--pipeline ruta.yaml` | Uno o mas jobs con params y `enabled` por job |
+| Pipeline YAML | `--pipeline ruta.yaml` | Uno o mas jobs con params, `enabled` y consolidacion opcional |
 
 Para correr multiples jobs o pasar params, usa siempre `--pipeline`. El reprocesamiento (`--reprocess`) es una operacion manual exclusiva de `--job`.
 
@@ -165,7 +182,6 @@ jobs:
   # Desactivar un job sin borrarlo:
   # - name: otro_job
   #   enabled: false
-
 ```
 
 ```bash
@@ -173,6 +189,63 @@ python -m src.main --pipeline config/pipelines/diario.yaml
 ```
 
 Los params se definen como dict YAML nativo — los tipos (`int`, `bool`, `float`, `str`) se preservan directamente en el scraper sin conversion manual.
+
+### Consolidacion
+
+Un pipeline puede incluir un paso de consolidacion opcional que combina los outputs de todos los jobs en un unico dataset. Solo se ejecuta si **todos** los jobs del pipeline finalizaron exitosamente.
+
+```yaml
+# config/pipelines/diario_consolidado.yaml
+name: diario_consolidado
+
+jobs:
+  - name: books_to_scrape
+  - name: viviendas_adonde
+
+consolidate:
+  enabled: true
+  module: ejemplo       # src/consolidadores/ejemplo.py
+  format: csv           # todos los jobs deben incluir este formato en output_formats
+  params: {}            # opcional, recibido en consolidate() como dict
+```
+
+```bash
+python -m src.main --pipeline config/pipelines/diario_consolidado.yaml
+```
+
+El bloque `consolidate` requiere:
+- `enabled` (bool): activa o desactiva la consolidacion
+- `module` (str): nombre del modulo en `src/consolidadores/` (sin `.py`)
+- `format` (str): formato compartido por todos los jobs (`csv`, `json`, `xml`, `xlsx`); todos deben incluirlo en su `output_formats`
+- `params` (dict, opcional): parametros adicionales para la logica del consolidador
+
+El framework valida estos requisitos **antes de lanzar cualquier job** — fallo rapido si algun job no cumple el formato requerido.
+
+### Crear un consolidador
+
+1. Crea `src/consolidadores/<nombre>.py` copiando `ejemplo.py`
+2. Ajusta `STORAGE_CONFIG` (carpeta, nombre, naming_mode, formatos de salida)
+3. Implementa `consolidate()` — el framework entrega los DataFrames listos, sin I/O
+
+```python
+# src/consolidadores/<nombre>.py
+import pandas as pd
+
+STORAGE_CONFIG = {
+    "output_folder": "output/consolidados",
+    "filename": "mi_consolidado",
+    "naming_mode": "date_suffix",
+    "output_formats": ["csv"],
+}
+
+def consolidate(job_dataframes: dict[str, pd.DataFrame], params: dict = None) -> list[dict]:
+    df_a = job_dataframes["job_a"]
+    df_b = job_dataframes["job_b"]
+    # ... logica de combinacion
+    return resultado.to_dict(orient="records")
+```
+
+El framework se encarga de leer los archivos de cada job con la configuracion correcta de `DATA_CONFIG` y entrega los DataFrames listos. El data engineer solo escribe logica.
 
 ### Comportamiento ante fallos en serie
 
@@ -382,10 +455,11 @@ Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danad
 def load_web_config(job_name: str) -> dict:
     """Carga la configuracion de la web desde src/<job_name>/web_config.yaml."""
 
-def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> None:
+def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> dict[str, Path]:
     """
     Punto de entrada generico para cualquier job. Llamado directamente desde main.py.
     params: dict nativo con los parametros definidos en el pipeline YAML (vacio si no se definio ninguno).
+    Retorna mapa de formato -> ruta del archivo guardado (ej: {"csv": Path(...), "json": Path(...)}).
 
     Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → cleanup_raw → save_data
     Sin proceso:       scrape → save_raw → normalize_in_memory → cleanup_raw → save_data
@@ -396,16 +470,21 @@ def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | Non
 ### `src/shared/storage.py`
 
 ```python
-def save_data(datos, format, data_config, storage_config, now=None) -> None:
+def save_data(datos, format, data_config, storage_config, now=None) -> Path:
     """Guarda los datos en el formato y ubicacion especificados preservando los tipos de cada campo.
     now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor que a save_raw()
-    garantiza timestamps coherentes entre el raw y el output de una misma ejecucion."""
+    garantiza timestamps coherentes entre el raw y el output de una misma ejecucion.
+    Retorna la ruta del archivo guardado."""
 
 def save_raw(datos: pd.DataFrame, raw_config, data_config, now=None) -> str:
     """Guarda datos en bruto en el formato de raw_config["format"]. Retorna el sufijo timestamp.
     datos: DataFrame ya construido (string-first). El caller es responsable de construirlo.
     now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor que a save_data()
     garantiza coherencia de timestamps entre raw y output."""
+
+def load_output(filepath: Path, format: str, data_config: dict) -> pd.DataFrame:
+    """Lee un archivo de output y lo retorna como DataFrame usando la config correcta de DATA_CONFIG.
+    Usada por el runner para preparar los DataFrames antes de pasarlos al consolidador."""
 
 def load_raw(suffix, raw_config, data_config) -> list[dict]:
     """Lee un raw existente y lo retorna como lista de dicts sin transformar. Lee todo como str."""
@@ -481,6 +560,9 @@ Valida automaticamente todos los `.yaml` presentes en `config/pipelines/` — no
 | `TestPipelineYAML` | `test_pipeline_params_are_dicts_if_present` | `params` es dict nativo YAML, no string |
 | `TestPipelineYAML` | `test_pipeline_enabled_is_bool_if_present` | `enabled` es `true` o `false` |
 | `TestPipelineYAML` | `test_pipeline_metadata_types_if_present` | `name` y `description` del pipeline son strings |
+| `TestPipelineYAML` | `test_consolidate_structure_if_present` | Valida estructura del bloque `consolidate` cuando esta presente |
+| `TestPipelineYAML` | `test_consolidate_module_exists_if_enabled` | El modulo consolidador existe en `src/consolidadores/` cuando `enabled: true` |
+| `TestPipelineYAML` | `test_consolidate_format_in_all_jobs_if_enabled` | Todos los jobs activos incluyen el `format` de consolidacion en su `output_formats` |
 
 ### `tests/viviendas_adonde/test_viviendas_adonde.py`
 

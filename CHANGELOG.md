@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.40.0] - 2026-03-24
+
+### Added
+- `src/consolidadores/__init__.py`: nuevo paquete Python para alojar los modulos consolidadores
+- `src/consolidadores/ejemplo.py`: consolidador de ejemplo con `STORAGE_CONFIG` y funcion `consolidate(job_dataframes, params)` — el data engineer desempaqueta los DataFrames por nombre y escribe solo logica de negocio; el I/O lo maneja el framework
+- `config/pipelines/diario_consolidado.yaml`: pipeline de ejemplo con consolidacion activada — ejecuta `books_to_scrape` y `viviendas_adonde` y consolida los resultados en `output/consolidados/`
+- `src/main.py` `_validate_consolidation()`: nueva funcion que valida antes de correr cualquier job que `consolidate.format` este definido, sea un formato soportado, `consolidate.module` exista, y que todos los jobs del pipeline incluyan ese formato en su `output_formats`; falla rapido con mensaje claro si alguna condicion no se cumple
+- `src/main.py` `_run_consolidation()`: nueva funcion que carga dinamicamente `src/consolidadores/<module>.py`, lee los outputs de cada job como DataFrames via `load_output()`, llama `consolidate(job_dataframes, params)` y persiste el resultado usando `save_data()` con el `STORAGE_CONFIG` del propio consolidador
+- `src/shared/storage.py` `load_output()`: nueva funcion publica que lee un archivo de output y lo retorna como `pd.DataFrame` usando la config correcta de `DATA_CONFIG`; usada por el runner para preparar los DataFrames antes de consolidar
+- `tests/test_pipelines.py` `test_consolidate_structure_if_present`: valida estructura del bloque `consolidate` cuando esta presente (`enabled` bool, `module` string no vacio, `format` en formatos soportados, `params` dict si aparece)
+- `tests/test_pipelines.py` `test_consolidate_module_exists_if_enabled`: verifica que el modulo consolidador exista en `src/consolidadores/` cuando `enabled: true`
+- `tests/test_pipelines.py` `test_consolidate_format_in_all_jobs_if_enabled`: verifica que todos los jobs activos del pipeline incluyan el `format` de consolidacion en su `output_formats`
+
+### Changed
+- `src/shared/storage.py` `save_data()`: firma actualizada de `-> None` a `-> Path` — retorna la ruta del archivo guardado; permite al runner acumular los paths generados en cada job para pasarlos al consolidador
+- `src/shared/job_runner.py` `_save_output()`: actualizado para capturar los paths retornados por `save_data()` y retornarlos como `dict[str, Path]` (`{"csv": Path(...), "json": Path(...)}`)
+- `src/shared/job_runner.py` `run()`: firma actualizada de `-> None` a `-> dict[str, Path]` — retorna el mapa de formato -> ruta generada en esa ejecucion
+- `src/main.py` `_load_pipeline()`: firma actualizada de `-> list[dict]` a `-> tuple[list[dict], dict | None]` — retorna ademas el bloque `consolidate` del YAML (o `None` si no existe)
+- `src/main.py` `_run_series()`: acepta `consolidate_config` opcional; acumula `job_outputs` durante la serie; ejecuta la consolidacion al final si todos los jobs fueron exitosos
+- `config/pipelines/diario.yaml`: ampliado el bloque de comentarios con documentacion del bloque `consolidate` y ejemplo comentado listo para descomentar
+
+### Behavior
+```
+# Pipeline sin consolidacion (comportamiento anterior, sin cambios)
+python -m src.main --pipeline config/pipelines/diario.yaml
+
+# Pipeline con consolidacion
+python -m src.main --pipeline config/pipelines/diario_consolidado.yaml
+# → jobs corren en serie
+# → si todos exitosos: consolida outputs en output/consolidados/<nombre>_<fecha>.<formato>
+# → si algun job falla: consolidacion omitida, se registra advertencia
+```
+
+### Design decisions
+- El framework carga los archivos de cada job como DataFrames antes de llamar a `consolidate()` — el data engineer recibe datos listos, nunca paths ni I/O
+- La consolidacion solo corre si **todos** los jobs del pipeline fueron exitosos — datos parciales no consolidan
+- La validacion de formato compartido ocurre **antes** de lanzar cualquier job — fallo rapido, no a mitad del pipeline
+- El consolidador es autocontenido: define su propio `STORAGE_CONFIG` (carpeta, nombre, naming_mode, formatos de salida)
+- Output del consolidado en `output/consolidados/` con naming por fecha por defecto
+
 ## [0.39.0] - 2026-03-24
 
 ### Changed

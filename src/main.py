@@ -2,11 +2,16 @@ import argparse
 import importlib
 import logging
 import yaml
+from datetime import datetime
 from pathlib import Path
 from src.shared import job_runner
+from src.shared.storage import save_data, load_output
+from config import global_settings
 
 # Nombre explicito para que propague a "src" tanto al ejecutar con -m como al importar
 logger = logging.getLogger("src.main")
+
+SUPPORTED_FORMATS = {"csv", "json", "xml", "xlsx"}
 
 
 def _setup_console_handler() -> None:
@@ -53,14 +58,110 @@ def _make_args(job_name: str) -> argparse.Namespace:
     )
 
 
-def _run_series(job_entries: list[dict]) -> None:
+# ---------------------------------------------------------------------------
+# Consolidacion
+# ---------------------------------------------------------------------------
+
+
+def _validate_consolidation(job_entries: list[dict], consolidate_config: dict) -> None:
+    """
+    Valida antes de correr cualquier job que todos tengan el formato de
+    consolidacion en su output_formats. Falla rapido con mensaje claro.
+    """
+    fmt = consolidate_config.get("format")
+    if not fmt:
+        logger.error("consolidate.format es obligatorio cuando consolidate.enabled es true.")
+        raise SystemExit(1)
+
+    if fmt not in SUPPORTED_FORMATS:
+        logger.error(f"consolidate.format='{fmt}' no es valido. Formatos soportados: {sorted(SUPPORTED_FORMATS)}")
+        raise SystemExit(1)
+
+    module_name = consolidate_config.get("module")
+    if not module_name:
+        logger.error("consolidate.module es obligatorio cuando consolidate.enabled es true.")
+        raise SystemExit(1)
+
+    for entry in job_entries:
+        job_name = entry["name"]
+        try:
+            settings = importlib.import_module(f"src.{job_name}.settings")
+        except ModuleNotFoundError:
+            continue  # El error de job no encontrado se manejara al ejecutarlo
+        output_formats = settings.STORAGE_CONFIG.get("output_formats", ["csv"])
+        if fmt not in output_formats:
+            logger.error(
+                f"Consolidacion activada con format='{fmt}', pero el job '{job_name}' "
+                f"no incluye '{fmt}' en output_formats: {output_formats}. "
+                f"Agrega '{fmt}' a STORAGE_CONFIG['output_formats'] en src/{job_name}/settings.py"
+            )
+            raise SystemExit(1)
+
+
+def _run_consolidation(job_outputs: dict[str, Path], consolidate_config: dict) -> None:
+    """
+    Carga el modulo consolidador, ejecuta consolidate() y guarda el resultado.
+
+    Args:
+        job_outputs:        Mapa job_name -> Path del archivo generado (formato de consolidacion).
+        consolidate_config: Bloque 'consolidate' del pipeline YAML.
+    """
+    module_name = consolidate_config["module"]
+    params = consolidate_config.get("params") or {}
+
+    try:
+        consolidator = importlib.import_module(f"src.consolidadores.{module_name}")
+    except ModuleNotFoundError:
+        logger.error(
+            f"Consolidador '{module_name}' no encontrado. "
+            f"Crea el modulo en src/consolidadores/{module_name}.py"
+        )
+        raise SystemExit(1)
+
+    logger.info(f"\nIniciando consolidacion: {module_name}")
+    logger.info(f"Fuentes: {list(job_outputs.keys())}")
+
+    fmt = consolidate_config["format"]
+    job_dataframes = {
+        job_name: load_output(filepath, fmt, global_settings.DATA_CONFIG)
+        for job_name, filepath in job_outputs.items()
+    }
+
+    result = consolidator.consolidate(job_dataframes, params)
+
+    if not result:
+        logger.warning("El consolidador no retorno datos.")
+        return
+
+    now = datetime.now()
+    storage_config = consolidator.STORAGE_CONFIG
+    output_formats = storage_config.get("output_formats", ["csv"])
+
+    for fmt in output_formats:
+        save_data(result, fmt, global_settings.DATA_CONFIG, storage_config, now)
+
+    logger.info("Consolidacion finalizada")
+
+
+# ---------------------------------------------------------------------------
+# Ejecucion en serie
+# ---------------------------------------------------------------------------
+
+
+def _run_series(job_entries: list[dict], consolidate_config: dict | None = None) -> None:
     """
     Ejecuta una lista de jobs en serie.
     Cada entrada es un dict con claves: name (str), params (dict), reprocess (str|None).
     Si un job falla, registra el error y continua con el siguiente.
+    Si consolidate_config esta activo y todos los jobs fueron exitosos, ejecuta la consolidacion.
     """
+    if consolidate_config and consolidate_config.get("enabled"):
+        _validate_consolidation(job_entries, consolidate_config)
+
     total = len(job_entries)
     failed = []
+    job_outputs: dict[str, Path] = {}
+    consolidation_format: str = (consolidate_config or {}).get("format", "")
 
     for i, entry in enumerate(job_entries, start=1):
         job_name = entry["name"]
@@ -69,7 +170,9 @@ def _run_series(job_entries: list[dict]) -> None:
 
         try:
             scrape_fn, process_fn, settings = _load_job_parts(job_name)
-            job_runner.run(_make_args(job_name), scrape_fn, process_fn, settings, job_name, params=params)
+            output_paths = job_runner.run(_make_args(job_name), scrape_fn, process_fn, settings, job_name, params=params)
+            if consolidation_format and consolidation_format in output_paths:
+                job_outputs[job_name] = output_paths[consolidation_format]
         except SystemExit:
             raise
         except Exception as e:
@@ -81,10 +184,25 @@ def _run_series(job_entries: list[dict]) -> None:
     if failed:
         logger.warning(f"Jobs con error: {', '.join(failed)}")
 
+    if consolidate_config and consolidate_config.get("enabled"):
+        if failed:
+            logger.warning(
+                f"Consolidacion omitida: {len(failed)} job(s) fallaron "
+                f"({', '.join(failed)}). Todos los jobs deben ser exitosos."
+            )
+        else:
+            _run_consolidation(job_outputs, consolidate_config)
 
-def _load_pipeline(path: str) -> list[dict]:
+
+# ---------------------------------------------------------------------------
+# Carga de pipeline
+# ---------------------------------------------------------------------------
+
+
+def _load_pipeline(path: str) -> tuple[list[dict], dict | None]:
     """
-    Carga un pipeline YAML y retorna la lista de entradas de jobs.
+    Carga un pipeline YAML y retorna la lista de entradas de jobs y la
+    configuracion de consolidacion (o None si no esta definida).
 
     Formato esperado:
         name: mi_pipeline           # opcional
@@ -97,6 +215,12 @@ def _load_pipeline(path: str) -> list[dict]:
               pagina: 1
             enabled: false          # opcional, omitir o poner true para ejecutar
           - name: viviendas_adonde
+
+        consolidate:                # opcional
+          enabled: true
+          module: mi_consolidador   # src/consolidadores/mi_consolidador.py
+          format: csv               # formato compartido por todos los jobs
+          params: {}                # opcional
     """
     pipeline_path = Path(path)
     if not pipeline_path.is_file():
@@ -127,7 +251,8 @@ def _load_pipeline(path: str) -> list[dict]:
             "params": item.get("params") or {},
         })
 
-    return entries
+    consolidate_config = data.get("consolidate") or None
+    return entries, consolidate_config
 
 
 def main() -> None:
@@ -186,9 +311,9 @@ def main() -> None:
         job_runner.run(args, scrape_fn, process_fn, settings, args.job)
 
     elif args.pipeline:
-        entries = _load_pipeline(args.pipeline)
+        entries, consolidate_config = _load_pipeline(args.pipeline)
         logger.info(f"Pipeline '{args.pipeline}': {len(entries)} job(s)")
-        _run_series(entries)
+        _run_series(entries, consolidate_config)
 
     else:
         parser.error("Especifica un modo de ejecucion: --job o --pipeline. Usa --list para ver los jobs disponibles.")

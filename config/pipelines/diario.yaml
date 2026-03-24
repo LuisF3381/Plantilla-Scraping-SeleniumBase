@@ -12,6 +12,16 @@
 #   name    (obligatorio): nombre del job (carpeta en src/)
 #   params  (opcional):    parametros como dict nativo YAML con tipos reales
 #   enabled (opcional):    false para omitir el job sin borrarlo (default: true)
+#
+# Bloque consolidate (opcional):
+#   enabled (obligatorio): true para activar la consolidacion
+#   module  (obligatorio): nombre del modulo en src/consolidadores/ (sin .py)
+#   format  (obligatorio): formato compartido por todos los jobs (csv/json/xml/xlsx)
+#                          todos los jobs deben incluirlo en su output_formats
+#   params  (opcional):    parametros adicionales para el consolidador
+#
+# Nota: la consolidacion solo se ejecuta si TODOS los jobs del pipeline
+# finalizan exitosamente.
 # =============================================================================
 
 name: diario
@@ -35,3 +45,9 @@ jobs:
   #   params:
   #     region: lima
 
+# Ejemplo: consolidacion activada (descomenta para usar)
+# consolidate:
+#   enabled: true
+#   module: ejemplo                 # src/consolidadores/ejemplo.py
+#   format: csv                     # todos los jobs deben incluir "csv" en output_formats
+#   params: {}                      # opcional

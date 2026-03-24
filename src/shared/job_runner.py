@@ -99,19 +99,25 @@ def _run_reprocess(suffix: str, process_fn, settings) -> list[dict]:
     return process_fn(df)
 
 
-def _save_output(processed: list[dict], settings, now: datetime) -> None:
-    """Guarda los datos procesados en todos los formatos configurados."""
+def _save_output(processed: list[dict], settings, now: datetime) -> dict[str, Path]:
+    """Guarda los datos procesados en todos los formatos configurados.
+
+    Returns:
+        dict[str, Path]: Mapa de formato -> ruta del archivo guardado.
+    """
     output_formats = settings.STORAGE_CONFIG.get("output_formats", ["csv"])
+    paths: dict[str, Path] = {}
     for formato in output_formats:
-        save_data(processed, formato, global_settings.DATA_CONFIG, settings.STORAGE_CONFIG, now)
+        paths[formato] = save_data(processed, formato, global_settings.DATA_CONFIG, settings.STORAGE_CONFIG, now)
     logger.info("Proceso finalizado")
+    return paths
 
 
 # ---------------------------------------------------------------------------
 # Punto de entrada generico (llamado desde app_job.py de cada job)
 # ---------------------------------------------------------------------------
 
-def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> None:
+def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> dict[str, Path]:
     """
     Punto de entrada generico para cualquier job.
 
@@ -122,6 +128,9 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
         settings:   Modulo de configuracion del job
         job_name:   Nombre del job (nombre de la carpeta en src/)
         params:     Parametros del job definidos en el pipeline YAML (dict nativo)
+
+    Returns:
+        dict[str, Path]: Mapa de formato -> ruta del archivo guardado (ej: {"csv": Path(...)}).
     """
     now = datetime.now()
     setup_logger(job_name, now, **global_settings.LOG_CONFIG)
@@ -134,12 +143,14 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
         else:
             processed = _run_full(scrape_fn, process_fn, settings, job_name, now, params)
 
-        _save_output(processed, settings, now)
+        output_paths = _save_output(processed, settings, now)
 
         # Bug fix: cleanup_raw se ejecuta DESPUES de guardar el output para evitar
         # perdida de datos si _save_output falla (disco lleno, permisos, etc.)
         if not args.reprocess:
             cleanup_raw(settings.RAW_CONFIG)
+
+        return output_paths
 
     except Exception as e:
         logger.error(f"Error durante la ejecucion: {e}", exc_info=True)

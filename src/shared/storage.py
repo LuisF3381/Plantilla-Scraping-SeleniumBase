@@ -100,7 +100,7 @@ def build_filepath(storage_config: dict, format: str, now: datetime | None = Non
     return filepath
 
 
-def save_data(datos: list[dict], format: str, data_config: dict, storage_config: dict, now: datetime | None = None) -> None:
+def save_data(datos: list[dict], format: str, data_config: dict, storage_config: dict, now: datetime | None = None) -> Path:
     """
     Guarda los datos en el formato y ubicacion especificados.
 
@@ -110,6 +110,9 @@ def save_data(datos: list[dict], format: str, data_config: dict, storage_config:
         data_config:    Diccionario con configuraciones de cada formato
         storage_config: Diccionario con configuracion de almacenamiento
         now:            Momento de referencia para el nombre del archivo (ver build_filepath)
+
+    Returns:
+        Path: Ruta del archivo guardado
     """
     if format not in data_config:
         raise ValueError(f"Formato no soportado: {format}. Disponibles: {list(data_config.keys())}")
@@ -118,6 +121,7 @@ def save_data(datos: list[dict], format: str, data_config: dict, storage_config:
     filepath.parent.mkdir(parents=True, exist_ok=True)
     _write_df(pd.DataFrame(datos), filepath, format, data_config[format])
     logger.info(f"Datos guardados en {filepath} ({len(datos)} registros)")
+    return filepath
 
 
 def save_raw(datos: pd.DataFrame, raw_config: dict, data_config: dict, now: datetime | None = None) -> str:
@@ -151,6 +155,24 @@ def save_raw(datos: pd.DataFrame, raw_config: dict, data_config: dict, now: date
     logger.info(f"Raw guardado en {filepath} ({len(datos)} registros)")
 
     return suffix
+
+
+def load_output(filepath: Path, format: str, data_config: dict) -> pd.DataFrame:
+    """
+    Lee un archivo de output y lo retorna como DataFrame.
+    Usado por el runner para cargar los outputs de cada job antes de consolidar.
+
+    Args:
+        filepath:    Ruta del archivo a leer
+        format:      Formato del archivo (csv, json, xml, xlsx)
+        data_config: Diccionario con configuraciones de formato (DATA_CONFIG)
+
+    Returns:
+        pd.DataFrame con el contenido del archivo
+    """
+    if format not in data_config:
+        raise ValueError(f"Formato no soportado: {format}. Disponibles: {list(data_config.keys())}")
+    return _read_df(filepath, format, data_config[format])
 
 
 def load_raw(suffix: str, raw_config: dict, data_config: dict) -> list[dict]:
