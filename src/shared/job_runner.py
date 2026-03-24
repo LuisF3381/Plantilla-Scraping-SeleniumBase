@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 import pandas as pd
 import yaml
@@ -52,47 +51,6 @@ def load_web_config(job_name: str) -> dict:
 # ---------------------------------------------------------------------------
 # Flujos internos
 # ---------------------------------------------------------------------------
-
-def _parse_params(raw: str | None) -> dict:
-    """
-    Convierte el string de parametros CLI en un diccionario.
-
-    Args:
-        raw: String en formato "clave=valor&clave2=valor2", o None si no se paso --params
-
-    Returns:
-        dict con los parametros, o dict vacio si raw es None
-
-    Raises:
-        ValueError: Si algun par no tiene el formato "clave=valor"
-    """
-    if not raw:
-        return {}
-    try:
-        return dict(p.split("=", 1) for p in raw.split("&"))
-    except ValueError:
-        raise ValueError(
-            f"Formato de --params invalido: '{raw}'. "
-            'Usa el formato "clave=valor&clave2=valor2"'
-        )
-
-
-def _save_last_params(job_name: str, params: dict) -> None:
-    """Persiste los params en .state/<job>_params.json para reutilizarlos en la proxima ejecucion."""
-    path = _PROJECT_ROOT / ".state" / f"{job_name}_params.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(params, ensure_ascii=False, indent=2), encoding="utf-8")
-    logger.info(f"Params guardados en {path}")
-
-
-def _load_last_params(job_name: str) -> dict:
-    """Carga los params persistidos de la ultima ejecucion. Retorna dict vacio si no existen."""
-    path = _PROJECT_ROOT / ".state" / f"{job_name}_params.json"
-    if not path.exists():
-        return {}
-    params = json.loads(path.read_text(encoding="utf-8"))
-    logger.info(f"Params cargados de ejecucion anterior: {params}")
-    return params
 
 
 def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, params: dict) -> list[dict]:
@@ -153,7 +111,7 @@ def _save_output(processed: list[dict], settings, now: datetime) -> None:
 # Punto de entrada generico (llamado desde app_job.py de cada job)
 # ---------------------------------------------------------------------------
 
-def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str) -> None:
+def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> None:
     """
     Punto de entrada generico para cualquier job.
 
@@ -163,19 +121,12 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
         process_fn: Funcion process() del job
         settings:   Modulo de configuracion del job
         job_name:   Nombre del job (nombre de la carpeta en src/)
+        params:     Parametros del job definidos en el pipeline YAML (dict nativo)
     """
     now = datetime.now()
     setup_logger(job_name, now, **global_settings.LOG_CONFIG)
 
-    if getattr(args, "no_params", False):
-        params = {}
-        _save_last_params(job_name, {})
-        logger.info("--no-params: ejecutando sin parametros y limpiando estado persistido")
-    elif args.params:
-        params = _parse_params(args.params)
-        _save_last_params(job_name, params)
-    else:
-        params = _load_last_params(job_name)
+    params = params or {}
 
     try:
         if args.reprocess:

@@ -38,9 +38,6 @@ ScrapeCraft/
 │   ├── global_settings.py             # Config global: LOG_CONFIG, DATA_CONFIG
 │   └── pipelines/
 │       └── diario.yaml                # Ejemplo de pipeline multi-job
-├── .state/                            # Estado de ejecucion (gitignored)
-│   ├── books_to_scrape_params.json    # Params persistidos del ultimo run
-│   └── viviendas_adonde_params.json
 ├── tests/
 │   ├── test_global.py                 # Tests de configuracion global
 │   ├── viviendas_adonde/
@@ -121,9 +118,7 @@ python -m src.main --list
 
 # --- Job individual ---
 python -m src.main --job viviendas_adonde
-python -m src.main --job books_to_scrape --params "categoria=mystery&pagina=2"
 python -m src.main --job books_to_scrape --reprocess 20260313_142546
-python -m src.main --job books_to_scrape --no-params
 
 # --- Ejecucion en serie ---
 python -m src.main --jobs books_to_scrape,viviendas_adonde   # subset especifico
@@ -143,12 +138,12 @@ ScrapeCraft soporta cuatro modos de ejecucion que son mutuamente excluyentes:
 
 | Modo | Comando | Params |
 |------|---------|--------|
-| Job individual | `--job nombre` | `--params`, `--no-params` o `.state/<job>_params.json` |
-| Subset especifico | `--jobs job1,job2,...` | `.state/<job>_params.json` de cada job |
-| Todos los jobs | `--all` | `.state/<job>_params.json` de cada job |
-| Pipeline YAML | `--pipeline ruta.yaml` | Campo `params` del YAML |
+| Job individual | `--job nombre` | Sin params (usa `--reprocess` si necesitas reprocesar) |
+| Subset especifico | `--jobs job1,job2,...` | Sin params |
+| Todos los jobs | `--all` | Sin params |
+| Pipeline YAML | `--pipeline ruta.yaml` | Campo `params` nativo YAML por job |
 
-`--reprocess`, `--params` y `--no-params` solo son compatibles con `--job`. En modos de serie, cada job resuelve sus params automaticamente desde su archivo en `.state/`.
+Para pasar params a un job, usa siempre `--pipeline`. `--reprocess` solo es compatible con `--job`.
 
 ### Pipeline YAML
 
@@ -156,19 +151,35 @@ Permite definir pipelines nombrados y reutilizables con params independientes po
 
 ```yaml
 # config/pipelines/diario.yaml
+name: diario
+description: "Scraping diario de catalogo y viviendas"   # opcional
+
 jobs:
   - name: books_to_scrape
-    params: "categoria=mystery&pagina=1"   # opcional
+    params:               # opcional, dict nativo YAML
+      categoria: mystery
+      pagina: 1           # llega como int, no como str
 
   - name: viviendas_adonde
-    params: "pais=peru"
+    params:
+      pais: peru
+      max_paginas: 5
+      solo_nuevos: true   # llega como bool
+
+  # Desactivar un job sin borrarlo:
+  # - name: otro_job
+  #   enabled: false
+
+  # Reprocesar raw existente sin volver a scrapear:
+  # - name: books_to_scrape
+  #   reprocess: "20260323_142546"
 ```
 
 ```bash
 python -m src.main --pipeline config/pipelines/diario.yaml
 ```
 
-Los params del YAML se pasan al scraper de cada job y se persisten en `.state/<job>_params.json`. Si un job no tiene `params` en el YAML, carga su archivo de params en `.state/` como en modo normal.
+Los params se definen como dict YAML nativo — los tipos (`int`, `bool`, `float`, `str`) se preservan directamente en el scraper sin conversion manual.
 
 ### Comportamiento ante fallos en serie
 
@@ -205,51 +216,6 @@ scrape() → save_raw() → normalize_in_memory() → save_data() → cleanup_ra
 ```
 
 Util cuando la web ya devuelve datos normalizados y no se requiere transformacion. Se activa con `SKIP_PROCESS = True` en `settings.py`.
-
-### Parametros para el scraper (`--params`)
-
-Permite pasar valores dinamicos al scraper sin tocar el codigo ni la configuracion:
-
-```bash
-python -m src.main --job viviendas_adonde --params "fecha=01/12/2024&pais=peru"
-```
-
-El string se parsea a un dict y llega al scraper como el argumento `params`:
-
-```python
-def scrape(driver, web_config, params):
-    fecha = params.get("fecha")   # "01/12/2024"
-    pais  = params.get("pais")    # "peru"
-    # Usar para construir la URL, filtrar elementos, ajustar selectores, etc.
-```
-
-**Reglas del formato:**
-- Separador de pares: `&`
-- Separador de clave y valor: `=`
-- `&` y `=` son caracteres reservados y no pueden aparecer en los valores
-- Todos los valores llegan como `str` — convierte el tipo dentro del scraper si es necesario
-- En modo `--reprocess` los params se ignoran (el scraper no se ejecuta)
-
-**Persistencia de params entre ejecuciones:**
-
-Cada vez que se pasa `--params`, el sistema los guarda en `.state/<job>_params.json`. Si en la siguiente ejecucion no se pasa `--params`, se cargan automaticamente los de la ultima vez:
-
-```bash
-# Define y guarda los params
-python -m src.main --job viviendas_adonde --params "fecha=01/12/2024&pais=peru"
-
-# Las siguientes ejecuciones los recuerdan sin escribirlos
-python -m src.main --job viviendas_adonde
-python -m src.main --job viviendas_adonde
-
-# Para cambiarlos, vuelve a pasar --params
-python -m src.main --job viviendas_adonde --params "fecha=15/12/2024&pais=argentina"
-
-# Para ejecutar sin parametros y limpiar el estado persistido
-python -m src.main --job viviendas_adonde --no-params
-```
-
-`--no-params` y `--params` son mutuamente excluyentes. Cada job tiene su propio archivo de params independiente en `.state/`. El directorio esta en `.gitignore` — los params no se versionan.
 
 ### Reprocesamiento
 
@@ -422,9 +388,10 @@ Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danad
 def load_web_config(job_name: str) -> dict:
     """Carga la configuracion de la web desde src/<job_name>/web_config.yaml."""
 
-def run(args, scrape_fn, process_fn, settings, job_name: str) -> None:
+def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> None:
     """
     Punto de entrada generico para cualquier job. Llamado directamente desde main.py.
+    params: dict nativo con los parametros definidos en el pipeline YAML (vacio si no se definio ninguno).
 
     Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → cleanup_raw → save_data
     Sin proceso:       scrape → save_raw → normalize_in_memory → cleanup_raw → save_data
@@ -471,11 +438,11 @@ def safe_get_attr(element, xpath, attr, fallback="") -> str:
 ### `src/<job>/scraper.py`
 
 ```python
-def scrape(driver, web_config, params: dict = None) -> list[dict]:
+def scrape(driver, web_config, params: dict) -> list[dict]:
     """
     Extrae datos desde la URL usando los selectores del archivo de configuracion.
-    params: dict con los parametros pasados via --params en CLI (vacio si no se paso ninguno).
-    Los valores son siempre str — convierte tipos dentro del scraper si es necesario.
+    params: dict nativo con los parametros definidos en el pipeline YAML.
+    Los tipos se preservan directamente (int, bool, float, str) — no se requiere conversion manual.
     """
 ```
 

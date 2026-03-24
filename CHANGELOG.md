@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.35.0] - 2026-03-23
+
+### Removed
+- `src/main.py`: eliminados `--params` y `--no-params` del CLI — el formato `"clave=valor&clave2=valor2"` no soporta tipos nativos (todos los valores llegaban como `str`), era propenso a errores y duplicaba un mecanismo ya disponible en el pipeline YAML; los params se definen ahora exclusivamente en el YAML del pipeline
+- `src/shared/job_runner.py`: eliminadas `_parse_params()`, `_save_last_params()` y `_load_last_params()` — el sistema de persistencia en `.state/<job>_params.json` pierde su razon de existir al centralizar los params en el YAML; el directorio `.state/` ya no se genera en runtime
+- `src/shared/job_runner.py`: eliminado `import json` — ya no se usa tras la eliminacion del sistema `.state/`
+
+### Changed
+- `config/pipelines/diario.yaml`: params migrados de string URL-encoded (`"clave=valor&clave2=valor2"`) a dict nativo YAML — los tipos se preservan directamente (`pagina: 1` llega como `int`, `solo_nuevos: true` como `bool`, sin conversion manual en el scraper)
+- `src/shared/job_runner.py` `run()`: firma actualizada de `run(args, ..., job_name)` a `run(args, ..., job_name, params: dict | None = None)` — los params se reciben como dict nativo en lugar de derivarse de `args`
+- `src/main.py` `_make_args()`: eliminados `params` y `no_params` del `Namespace` — ya no forman parte del flujo de ejecucion
+- `src/main.py` `_run_series()`: extrae `params` (dict) y `reprocess` del entry y los pasa directamente a `job_runner.run()`
+
+### Added
+- `config/pipelines/diario.yaml`: metadatos a nivel de pipeline — campo `name` (mostrado en log al ejecutar) y `description` (opcional)
+- `config/pipelines/diario.yaml`: campo `enabled` por job — `enabled: false` omite el job sin necesidad de borrarlo del YAML; `true` por defecto
+- `config/pipelines/diario.yaml`: campo `reprocess` por job — permite forzar reprocesamiento de un raw existente desde el pipeline sin re-scrapear, equivalente a `--reprocess` en modo `--job`
+- `src/main.py` `_load_pipeline()`: logea nombre y descripcion del pipeline al cargarlo; soporta `enabled`, `reprocess` y params como dict nativo
+
+### CLI
+```bash
+# Antes (eliminado)
+python -m src.main --job viviendas_adonde --params "pais=peru&pagina=2"
+python -m src.main --job viviendas_adonde --no-params
+
+# Ahora: params en el pipeline YAML con tipos nativos
+# config/pipelines/mi_pipeline.yaml:
+#   jobs:
+#     - name: viviendas_adonde
+#       params:
+#         pais: peru
+#         pagina: 2
+python -m src.main --pipeline config/pipelines/mi_pipeline.yaml
+```
+
 ## [0.34.0] - 2026-03-23
 
 ### Fixed

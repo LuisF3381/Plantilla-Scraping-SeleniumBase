@@ -44,36 +44,35 @@ def _load_job_parts(job_name: str) -> tuple:
         raise SystemExit(1)
 
 
-def _make_args(job_name: str, params: str | None = None, reprocess: str | None = None) -> argparse.Namespace:
+def _make_args(job_name: str, reprocess: str | None = None) -> argparse.Namespace:
     """Construye un Namespace de args para un job individual dentro de una serie."""
     return argparse.Namespace(
         job=job_name,
         jobs=None,
         all=False,
         pipeline=None,
-        params=params,
         reprocess=reprocess,
-        no_params=False,
     )
 
 
 def _run_series(job_entries: list[dict]) -> None:
     """
     Ejecuta una lista de jobs en serie.
-    Cada entrada es un dict con claves: name (str), params (str|None).
+    Cada entrada es un dict con claves: name (str), params (dict), reprocess (str|None).
     Si un job falla, registra el error y continua con el siguiente.
     """
     total = len(job_entries)
     failed = []
 
     for i, entry in enumerate(job_entries, start=1):
-        job_name = entry["name"]
-        params   = entry.get("params")
+        job_name  = entry["name"]
+        params    = entry.get("params") or {}
+        reprocess = entry.get("reprocess")
         logger.info(f"\n[{i}/{total}] Iniciando job: {job_name}")
 
         try:
             scrape_fn, process_fn, settings = _load_job_parts(job_name)
-            job_runner.run(_make_args(job_name, params=params), scrape_fn, process_fn, settings, job_name)
+            job_runner.run(_make_args(job_name, reprocess=reprocess), scrape_fn, process_fn, settings, job_name, params=params)
         except SystemExit:
             raise
         except Exception as e:
@@ -91,9 +90,16 @@ def _load_pipeline(path: str) -> list[dict]:
     Carga un pipeline YAML y retorna la lista de entradas de jobs.
 
     Formato esperado:
+        name: mi_pipeline           # opcional
+        description: "..."          # opcional
+
         jobs:
           - name: books_to_scrape
-            params: "categoria=mystery"   # opcional
+            params:                 # opcional, dict nativo YAML
+              categoria: mystery
+              pagina: 1
+            reprocess: "20260323"   # opcional, omitir para scraping normal
+            enabled: false          # opcional, omitir o poner true para ejecutar
           - name: viviendas_adonde
     """
     pipeline_path = Path(path)
@@ -108,12 +114,23 @@ def _load_pipeline(path: str) -> list[dict]:
         logger.error(f"El pipeline '{path}' debe tener una clave 'jobs' con una lista de jobs.")
         raise SystemExit(1)
 
+    if "name" in data:
+        desc = f" — {data['description']}" if "description" in data else ""
+        logger.info(f"Pipeline: {data['name']}{desc}")
+
     entries = []
     for item in data["jobs"]:
         if "name" not in item:
             logger.error("Cada job del pipeline debe tener un campo 'name'.")
             raise SystemExit(1)
-        entries.append({"name": item["name"], "params": item.get("params")})
+        if item.get("enabled", True) is False:
+            logger.info(f"Job '{item['name']}' desactivado (enabled: false), omitiendo.")
+            continue
+        entries.append({
+            "name":      item["name"],
+            "params":    item.get("params") or {},
+            "reprocess": item.get("reprocess"),
+        })
 
     return entries
 
@@ -152,18 +169,6 @@ def main() -> None:
         metavar="SUFFIX",
         help="Solo con --job: reprocesar raw existente por sufijo (ej: 20260312_143052)"
     )
-    parser.add_argument(
-        "--params",
-        metavar="PARAMS",
-        default=None,
-        help='Solo con --job: parametros en formato "clave=valor&clave2=valor2"'
-    )
-    parser.add_argument(
-        "--no-params",
-        action="store_true",
-        dest="no_params",
-        help="Solo con --job: ejecutar sin parametros y limpiar el estado persistido"
-    )
 
     # --- Utilidades ---
     parser.add_argument(
@@ -185,15 +190,9 @@ def main() -> None:
             print("No se encontraron jobs. Crea uno en src/<nombre>/scraper.py")
         raise SystemExit(0)
 
-    # --reprocess, --params y --no-params son exclusivos de --job
+    # --reprocess es exclusivo de --job
     if args.reprocess and not args.job:
         parser.error("--reprocess solo puede usarse junto a --job.")
-    if args.params and not args.job:
-        parser.error("--params solo puede usarse junto a --job. Para series usa last_params.json o define params en el YAML del pipeline.")
-    if args.no_params and not args.job:
-        parser.error("--no-params solo puede usarse junto a --job.")
-    if args.no_params and args.params:
-        parser.error("--no-params y --params son mutuamente excluyentes.")
 
     # --- Despacho segun modo ---
 
