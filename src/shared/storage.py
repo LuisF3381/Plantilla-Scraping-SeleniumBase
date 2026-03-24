@@ -39,7 +39,9 @@ def _read_df(filepath: Path, format: str, config: dict) -> pd.DataFrame:
     if format == "csv":
         df = pd.read_csv(filepath, encoding=config.get("encoding", "utf-8"), sep=config.get("separator", ","), dtype=str)
     elif format == "json":
-        df = pd.read_json(filepath, orient=config.get("orient", "records"), dtype=str).astype(str)
+        # dtype=str no es efectivo en read_json (pandas infiere tipos numericos antes de aplicarlo).
+        # El .astype(str) posterior es quien garantiza la conversion a string.
+        df = pd.read_json(filepath, orient=config.get("orient", "records")).astype(str)
     elif format == "xml":
         df = pd.read_xml(filepath, dtype=str, encoding=config.get("encoding", "utf-8"))
     elif format == "xlsx":
@@ -118,12 +120,12 @@ def save_data(datos: list[dict], format: str, data_config: dict, storage_config:
     logger.info(f"Datos guardados en {filepath} ({len(datos)} registros)")
 
 
-def save_raw(datos: list[dict], raw_config: dict, data_config: dict, now: datetime | None = None) -> str:
+def save_raw(datos: pd.DataFrame, raw_config: dict, data_config: dict, now: datetime | None = None) -> str:
     """
     Guarda los datos en bruto con sufijo timestamp en el formato indicado por raw_config.
 
     Args:
-        datos:       Lista de diccionarios con los datos a guardar
+        datos:       DataFrame ya construido con los datos a guardar (string-first)
         raw_config:  Diccionario con configuracion del raw
         data_config: Diccionario con configuraciones de formato (DATA_CONFIG)
         now:         Momento de referencia para el sufijo. Si es None se usa datetime.now().
@@ -145,7 +147,7 @@ def save_raw(datos: list[dict], raw_config: dict, data_config: dict, now: dateti
     suffix: str = now.strftime("%Y%m%d_%H%M%S")
     filepath = raw_folder / f"{filename}_{suffix}.{format}"
 
-    _write_df(pd.DataFrame(datos), filepath, format, data_config[format], stringify=True)
+    _write_df(datos, filepath, format, data_config[format], stringify=True)
     logger.info(f"Raw guardado en {filepath} ({len(datos)} registros)")
 
     return suffix
@@ -198,7 +200,10 @@ def cleanup_raw(raw_config: dict) -> None:
 
     if mode == "keep_last_n":
         value: int = retention["value"]
-        files_to_delete: list[Path] = files[:-value] if len(files) > value else []
+        if value == 0:
+            files_to_delete: list[Path] = list(files)
+        else:
+            files_to_delete = files[:-value] if len(files) > value else []
     elif mode == "keep_days":
         value: int = retention["value"]
         cutoff: datetime = datetime.now() - timedelta(days=value)

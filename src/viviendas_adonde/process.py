@@ -22,7 +22,7 @@ def process(df: pd.DataFrame) -> list[dict]:
     df = df.copy()
 
     # Limpieza de espacios en todas las columnas de texto
-    for col in df.select_dtypes(include=["object", "str"]).columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         df[col] = df[col].str.strip()
 
     # Extraccion del precio numerico (elimina simbolo de moneda, separadores y texto)

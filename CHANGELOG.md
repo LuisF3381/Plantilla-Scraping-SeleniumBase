@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.34.0] - 2026-03-23
+
+### Fixed
+- `src/books_to_scrape/process.py`, `src/viviendas_adonde/process.py`: `select_dtypes(include=["object", "str"])` — `"str"` no es un dtype valido en pandas y era ignorado silenciosamente; corregido a `"string"` (el dtype correcto para `pd.StringDtype`)
+- `src/shared/job_runner.py`: `cleanup_raw()` se ejecutaba dentro de `_run_full()`, antes de que `_save_output()` guardara el output final; si `_save_output()` fallaba (disco lleno, permisos, etc.) el raw ya habia sido eliminado y los datos se perdian sin posibilidad de recuperacion; `cleanup_raw()` movido a `run()` y ejecutado despues de `_save_output()` — nuevo orden garantizado: `scrape → save_raw → process → save_data → cleanup_raw`
+- `src/shared/storage.py` `cleanup_raw()`: con `keep_last_n: 0` no se eliminaba ningun archivo — `files[:-0]` en Python es `files[:0]` que retorna lista vacia; añadido caso explicito `if value == 0: files_to_delete = list(files)`
+- `src/shared/job_runner.py` `_run_full()`: el sufijo retornado por `save_raw()` era descartado; ahora se captura y se loguea con el mensaje `"Si el proceso falla, puedes reprocesar con: --reprocess <sufijo>"` para facilitar recuperacion manual
+- `src/main.py`: `logger = logging.getLogger(__name__)` creaba el logger `"__main__"` al ejecutar con `python -m src.main`, que propaga al logger raiz en lugar de a `"src"`; los mensajes del orquestador desaparecian silenciosamente; corregido con nombre explicito `logging.getLogger("src.main")`
+
+### Changed
+- `src/shared/storage.py` `save_raw()`: firma cambiada de `list[dict]` a `pd.DataFrame` — el DataFrame se construye ahora una sola vez en `_run_full()` y se reutiliza tanto para `save_raw()` como para el procesamiento posterior, eliminando una construccion redundante de DataFrame sobre los mismos datos
+- `src/shared/storage.py` `_read_df()`: eliminado `dtype=str` de `pd.read_json()` — el parametro no previene la inferencia de tipos numericos en pandas (bug conocido); la conversion a string la realiza el `.astype(str)` posterior, que es la unica llamada efectiva; añadido comentario explicativo
+- `src/shared/job_runner.py` `_run_full()`: el DataFrame string-first se construye antes de llamar a `save_raw()` y se pasa directamente, eliminando la segunda construccion `pd.DataFrame(datos)` que existia anteriormente
+
+### Added
+- `src/main.py` `--no-params`: nuevo flag CLI exclusivo de `--job` que ejecuta el job sin parametros y limpia el estado persistido en `.state/<job>_params.json`; mutuamente excluyente con `--params`
+- `src/main.py` `_setup_console_handler()`: configura un handler de consola en el logger `"src"` al inicio de `main()` para capturar mensajes del orquestador (serie, pipeline) antes de que el primer job arranque; `setup_logger()` de cada job reemplaza este handler
+- `src/main.py`: mensajes del orquestador (`_run_series`, `_load_pipeline`, `_load_job_parts`) migrados de `print()` a `logger.info/error/warning` para que queden registrados en los archivos de log cuando el orquestador se ejecuta en entornos automatizados (CI/CD, cron); `print()` se mantiene exclusivamente para la salida de `--list`
+
+### CLI
+```bash
+# Ejecutar sin parametros y limpiar estado persistido
+python -m src.main --job books_to_scrape --no-params
+```
+
 ## [0.33.0] - 2026-03-19
 
 ### Removed

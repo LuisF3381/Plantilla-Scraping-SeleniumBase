@@ -2,7 +2,6 @@
 Configuracion especifica del job viviendas_adonde.
 Para configuracion global (logs, formatos) ver config/global_settings.py
 """
-
 # ============================================
 # CONFIGURACIÓN DEL DRIVER
 # ============================================

@@ -96,7 +96,8 @@ def _load_last_params(job_name: str) -> dict:
 
 
 def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, params: dict) -> list[dict]:
-    """Flujo completo: scraping → raw → (proceso opcional) → limpieza de raw."""
+    """Flujo completo: scraping → raw → (proceso opcional).
+    La limpieza de raw se realiza en run() despues de guardar el output."""
     logger.info("Iniciando scraper...")
     if params:
         logger.info(f"Parametros recibidos: {params}")
@@ -112,11 +113,13 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, par
     if not datos:
         raise RuntimeError("El scraper no retorno datos. Verifica la URL, los selectores o posible bloqueo.")
 
-    save_raw(datos, settings.RAW_CONFIG, global_settings.DATA_CONFIG, now)
-
-    # Normalizacion string-first en memoria (equivalente al ciclo save→load CSV)
+    # Normalizacion string-first: se construye el DataFrame una sola vez y se
+    # reutiliza tanto para save_raw como para el procesamiento posterior.
     df_raw = pd.DataFrame(datos).fillna("").astype(str)
     del datos
+
+    suffix = save_raw(df_raw, settings.RAW_CONFIG, global_settings.DATA_CONFIG, now)
+    logger.info(f"Si el proceso falla, puedes reprocesar con: --reprocess {suffix}")
 
     if settings.SKIP_PROCESS:
         logger.info("skip_process=True: omitiendo process.py, usando raw directamente")
@@ -124,7 +127,6 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, par
     else:
         processed = process_fn(df_raw)
 
-    cleanup_raw(settings.RAW_CONFIG)
     return processed
 
 
@@ -165,7 +167,11 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
     now = datetime.now()
     setup_logger(job_name, now, **global_settings.LOG_CONFIG)
 
-    if args.params:
+    if getattr(args, "no_params", False):
+        params = {}
+        _save_last_params(job_name, {})
+        logger.info("--no-params: ejecutando sin parametros y limpiando estado persistido")
+    elif args.params:
         params = _parse_params(args.params)
         _save_last_params(job_name, params)
     else:
@@ -178,6 +184,11 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
             processed = _run_full(scrape_fn, process_fn, settings, job_name, now, params)
 
         _save_output(processed, settings, now)
+
+        # Bug fix: cleanup_raw se ejecuta DESPUES de guardar el output para evitar
+        # perdida de datos si _save_output falla (disco lleno, permisos, etc.)
+        if not args.reprocess:
+            cleanup_raw(settings.RAW_CONFIG)
 
     except Exception as e:
         logger.error(f"Error durante la ejecucion: {e}", exc_info=True)

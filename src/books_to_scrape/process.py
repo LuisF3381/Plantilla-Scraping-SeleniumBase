@@ -31,7 +31,7 @@ def process(df: pd.DataFrame) -> list[dict]:
     df = df.copy()
 
     # Limpieza de espacios en columnas de texto
-    for col in df.select_dtypes(include=["object", "str"]).columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         df[col] = df[col].str.strip()
 
     # Precio: "£51.77" → 51.77 (float)

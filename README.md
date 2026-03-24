@@ -123,6 +123,7 @@ python -m src.main --list
 python -m src.main --job viviendas_adonde
 python -m src.main --job books_to_scrape --params "categoria=mystery&pagina=2"
 python -m src.main --job books_to_scrape --reprocess 20260313_142546
+python -m src.main --job books_to_scrape --no-params
 
 # --- Ejecucion en serie ---
 python -m src.main --jobs books_to_scrape,viviendas_adonde   # subset especifico
@@ -142,12 +143,12 @@ ScrapeCraft soporta cuatro modos de ejecucion que son mutuamente excluyentes:
 
 | Modo | Comando | Params |
 |------|---------|--------|
-| Job individual | `--job nombre` | `--params` o `.state/<job>_params.json` |
+| Job individual | `--job nombre` | `--params`, `--no-params` o `.state/<job>_params.json` |
 | Subset especifico | `--jobs job1,job2,...` | `.state/<job>_params.json` de cada job |
 | Todos los jobs | `--all` | `.state/<job>_params.json` de cada job |
 | Pipeline YAML | `--pipeline ruta.yaml` | Campo `params` del YAML |
 
-`--reprocess` y `--params` solo son compatibles con `--job`. En modos de serie, cada job resuelve sus params automaticamente desde su archivo en `.state/`.
+`--reprocess`, `--params` y `--no-params` solo son compatibles con `--job`. En modos de serie, cada job resuelve sus params automaticamente desde su archivo en `.state/`.
 
 ### Pipeline YAML
 
@@ -189,18 +190,18 @@ Jobs con error: viviendas_adonde
 ### Flujo completo (`skip_process=False`)
 
 ```
-scrape() → save_raw() → normalize_in_memory() → process() → cleanup_raw() → save_data()
+scrape() → save_raw() → normalize_in_memory() → process() → save_data() → cleanup_raw()
 ```
 
 1. Extrae datos de la web y los guarda en `raw/<job>/` como CSV con sufijo timestamp
 2. Normaliza el raw en memoria (`fillna("").astype(str)`) y aplica las transformaciones definidas en `process.py`
-3. Limpia archivos antiguos de `raw/<job>/` segun la politica de retencion configurada
-4. Guarda el resultado final en `output/<job>/` en los formatos configurados
+3. Guarda el resultado final en `output/<job>/` en los formatos configurados
+4. Limpia archivos antiguos de `raw/<job>/` segun la politica de retencion configurada — despues de confirmar que el output se guardo correctamente
 
 ### Flujo sin procesamiento (`skip_process=True`)
 
 ```
-scrape() → save_raw() → normalize_in_memory() → cleanup_raw() → save_data()
+scrape() → save_raw() → normalize_in_memory() → save_data() → cleanup_raw()
 ```
 
 Util cuando la web ya devuelve datos normalizados y no se requiere transformacion. Se activa con `SKIP_PROCESS = True` en `settings.py`.
@@ -243,9 +244,12 @@ python -m src.main --job viviendas_adonde
 
 # Para cambiarlos, vuelve a pasar --params
 python -m src.main --job viviendas_adonde --params "fecha=15/12/2024&pais=argentina"
+
+# Para ejecutar sin parametros y limpiar el estado persistido
+python -m src.main --job viviendas_adonde --no-params
 ```
 
-Cada job tiene su propio archivo de params independiente en `.state/`. El directorio esta en `.gitignore` — los params no se versionan.
+`--no-params` y `--params` son mutuamente excluyentes. Cada job tiene su propio archivo de params independiente en `.state/`. El directorio esta en `.gitignore` — los params no se versionan.
 
 ### Reprocesamiento
 
@@ -436,8 +440,9 @@ def save_data(datos, format, data_config, storage_config, now=None) -> None:
     now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor que a save_raw()
     garantiza timestamps coherentes entre el raw y el output de una misma ejecucion."""
 
-def save_raw(datos, raw_config, data_config, now=None) -> str:
+def save_raw(datos: pd.DataFrame, raw_config, data_config, now=None) -> str:
     """Guarda datos en bruto en el formato de raw_config["format"]. Retorna el sufijo timestamp.
+    datos: DataFrame ya construido (string-first). El caller es responsable de construirlo.
     now: datetime opcional; si se omite se usa datetime.now(). Pasar el mismo valor que a save_data()
     garantiza coherencia de timestamps entre raw y output."""
 

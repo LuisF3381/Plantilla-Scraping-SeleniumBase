@@ -1,8 +1,24 @@
 import argparse
 import importlib
+import logging
 import yaml
 from pathlib import Path
 from src.shared import job_runner
+
+# Nombre explicito para que propague a "src" tanto al ejecutar con -m como al importar
+logger = logging.getLogger("src.main")
+
+
+def _setup_console_handler() -> None:
+    """Configura un handler de consola en el logger 'src' para mensajes del
+    orquestador (serie, pipeline). setup_logger() de cada job reemplaza todos
+    los handlers cuando arranca, por lo que este no genera duplicados."""
+    src_logger = logging.getLogger("src")
+    src_logger.setLevel(logging.INFO)
+    src_logger.propagate = False
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    src_logger.addHandler(handler)
 
 
 def get_available_jobs() -> list[str]:
@@ -24,7 +40,7 @@ def _load_job_parts(job_name: str) -> tuple:
         return scraper.scrape, process.process, settings
     except ModuleNotFoundError:
         available = ", ".join(get_available_jobs()) or "ninguno"
-        print(f"Error: job '{job_name}' no encontrado. Jobs disponibles: {available}")
+        logger.error(f"Job '{job_name}' no encontrado. Jobs disponibles: {available}")
         raise SystemExit(1)
 
 
@@ -37,6 +53,7 @@ def _make_args(job_name: str, params: str | None = None, reprocess: str | None =
         pipeline=None,
         params=params,
         reprocess=reprocess,
+        no_params=False,
     )
 
 
@@ -52,7 +69,7 @@ def _run_series(job_entries: list[dict]) -> None:
     for i, entry in enumerate(job_entries, start=1):
         job_name = entry["name"]
         params   = entry.get("params")
-        print(f"\n[{i}/{total}] Iniciando job: {job_name}", flush=True)
+        logger.info(f"\n[{i}/{total}] Iniciando job: {job_name}")
 
         try:
             scrape_fn, process_fn, settings = _load_job_parts(job_name)
@@ -60,13 +77,13 @@ def _run_series(job_entries: list[dict]) -> None:
         except SystemExit:
             raise
         except Exception as e:
-            print(f"[{i}/{total}] ERROR en '{job_name}': {e}", flush=True)
+            logger.error(f"[{i}/{total}] ERROR en '{job_name}': {e}")
             failed.append(job_name)
 
-    print(f"\n{'='*50}", flush=True)
-    print(f"Serie finalizada: {total - len(failed)}/{total} jobs exitosos", flush=True)
+    logger.info(f"\n{'='*50}")
+    logger.info(f"Serie finalizada: {total - len(failed)}/{total} jobs exitosos")
     if failed:
-        print(f"Jobs con error: {', '.join(failed)}", flush=True)
+        logger.warning(f"Jobs con error: {', '.join(failed)}")
 
 
 def _load_pipeline(path: str) -> list[dict]:
@@ -81,20 +98,20 @@ def _load_pipeline(path: str) -> list[dict]:
     """
     pipeline_path = Path(path)
     if not pipeline_path.is_file():
-        print(f"Error: pipeline '{path}' no encontrado.")
+        logger.error(f"Pipeline '{path}' no encontrado.")
         raise SystemExit(1)
 
     with pipeline_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     if "jobs" not in data or not isinstance(data["jobs"], list):
-        print(f"Error: el pipeline '{path}' debe tener una clave 'jobs' con una lista de jobs.")
+        logger.error(f"El pipeline '{path}' debe tener una clave 'jobs' con una lista de jobs.")
         raise SystemExit(1)
 
     entries = []
     for item in data["jobs"]:
         if "name" not in item:
-            print("Error: cada job del pipeline debe tener un campo 'name'.")
+            logger.error("Cada job del pipeline debe tener un campo 'name'.")
             raise SystemExit(1)
         entries.append({"name": item["name"], "params": item.get("params")})
 
@@ -102,6 +119,8 @@ def _load_pipeline(path: str) -> list[dict]:
 
 
 def main() -> None:
+    _setup_console_handler()
+
     parser = argparse.ArgumentParser(description="ScrapeCraft - Web scraper multi-job")
 
     # --- Modos de ejecucion (mutuamente excluyentes) ---
@@ -139,6 +158,12 @@ def main() -> None:
         default=None,
         help='Solo con --job: parametros en formato "clave=valor&clave2=valor2"'
     )
+    parser.add_argument(
+        "--no-params",
+        action="store_true",
+        dest="no_params",
+        help="Solo con --job: ejecutar sin parametros y limpiar el estado persistido"
+    )
 
     # --- Utilidades ---
     parser.add_argument(
@@ -160,11 +185,15 @@ def main() -> None:
             print("No se encontraron jobs. Crea uno en src/<nombre>/scraper.py")
         raise SystemExit(0)
 
-    # --reprocess y --params son exclusivos de --job
+    # --reprocess, --params y --no-params son exclusivos de --job
     if args.reprocess and not args.job:
         parser.error("--reprocess solo puede usarse junto a --job.")
     if args.params and not args.job:
         parser.error("--params solo puede usarse junto a --job. Para series usa last_params.json o define params en el YAML del pipeline.")
+    if args.no_params and not args.job:
+        parser.error("--no-params solo puede usarse junto a --job.")
+    if args.no_params and args.params:
+        parser.error("--no-params y --params son mutuamente excluyentes.")
 
     # --- Despacho segun modo ---
 
@@ -181,14 +210,14 @@ def main() -> None:
     elif args.all:
         job_names = sorted(get_available_jobs())
         if not job_names:
-            print("No se encontraron jobs. Crea uno en src/<nombre>/scraper.py")
+            logger.info("No se encontraron jobs. Crea uno en src/<nombre>/scraper.py")
             raise SystemExit(0)
-        print(f"Jobs a ejecutar: {', '.join(job_names)}")
+        logger.info(f"Jobs a ejecutar: {', '.join(job_names)}")
         _run_series([{"name": name} for name in job_names])
 
     elif args.pipeline:
         entries = _load_pipeline(args.pipeline)
-        print(f"Pipeline '{args.pipeline}': {len(entries)} job(s)")
+        logger.info(f"Pipeline '{args.pipeline}': {len(entries)} job(s)")
         _run_series(entries)
 
     else:
