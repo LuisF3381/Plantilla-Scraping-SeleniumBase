@@ -19,6 +19,9 @@ def scrape(driver: Driver, web_config: dict, params: dict = None) -> list[dict]:
     Returns:
         list[dict]: Lista de diccionarios con los datos extraidos
     """
+    # =========================================================================
+    # ZONA DATA ENGINEER — implementar logica de navegacion y extraccion
+    # =========================================================================
     params = params or {}
     url: str = web_config["url"]
     selectors: dict = web_config["selectors"]

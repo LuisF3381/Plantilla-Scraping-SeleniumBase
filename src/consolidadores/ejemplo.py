@@ -16,9 +16,9 @@
 
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# Configuracion de almacenamiento del consolidado
-# ---------------------------------------------------------------------------
+# =========================================================================
+# ZONA DATA ENGINEER (1/2) — configurar almacenamiento del consolidado
+# =========================================================================
 
 STORAGE_CONFIG = {
     "output_folder": "output/consolidados",
@@ -27,9 +27,9 @@ STORAGE_CONFIG = {
     "output_formats": ["csv"],         # formatos en los que se guarda el consolidado
 }
 
-# ---------------------------------------------------------------------------
-# Logica de consolidacion — implementar aqui
-# ---------------------------------------------------------------------------
+# =========================================================================
+# FIN ZONA DATA ENGINEER (1/2)
+# =========================================================================
 
 
 def consolidate(job_dataframes: dict[str, pd.DataFrame], params: dict = None) -> list[dict]:
@@ -50,6 +50,9 @@ def consolidate(job_dataframes: dict[str, pd.DataFrame], params: dict = None) ->
     Returns:
         list[dict]: Datos consolidados. Cada dict es un registro del output final.
     """
+    # =========================================================================
+    # ZONA DATA ENGINEER (2/2) — implementar logica de consolidacion
+    # =========================================================================
     params = params or {}
 
     # --- Desempaquetar DataFrames por job ---

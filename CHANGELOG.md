@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.42.0] - 2026-03-24
+
+### Added
+- `README.md`: nueva seccion **"Zonas del data engineer"** con tabla de referencia rapida que mapea cada archivo a su zona editable y describe que implementar en cada una
+
+### Changed
+- `src/<job>/scraper.py` (x2): marcador `# ZONA DATA ENGINEER` al inicio del cuerpo de `scrape()` — delimita toda la logica de navegacion y extraccion
+- `src/<job>/utils.py` (x2): marcador `# ZONA DATA ENGINEER` al inicio del cuerpo de `parse_record()` — delimita la extraccion campo a campo
+- `src/<job>/process.py` (x2): marcadores de apertura y cierre en el cuerpo de `process()` — el cierre se coloca justo antes del `return df.to_dict(orient="records")` para dejar claro que ese contrato pertenece al framework; en `books_to_scrape/process.py` el marcador de apertura se situa a nivel de modulo para incluir tambien las constantes de apoyo (ej: `_RATING_MAP`)
+- `src/<job>/settings.py` (x2): marcador `# ZONA DATA ENGINEER` tras el docstring del modulo — indica que todo el archivo es territorio del data engineer
+- `src/<job>/web_config.yaml` (x2): marcador `# ZONA DATA ENGINEER` al inicio del archivo
+- `src/consolidadores/ejemplo.py`: dos marcadores numerados — `(1/2)` alrededor de `STORAGE_CONFIG` y `(2/2)` al inicio del cuerpo de `consolidate()`
+- `config/global_settings.py`: marcador con nota de "casos excepcionales" (encoding, separadores, nivel de log)
+- `config/pipelines/diario.yaml`, `config/pipelines/diario_consolidado.yaml`: marcador `# ZONA DATA ENGINEER` antes del contenido editable de cada pipeline
+
 ## [0.41.0] - 2026-03-24
 
 ### Fixed

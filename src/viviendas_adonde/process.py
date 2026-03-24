@@ -15,10 +15,10 @@ def process(df: pd.DataFrame) -> list[dict]:
         list[dict]: Lista de diccionarios con los datos procesados
     """
 
-    # CODIGO IMPLEMENTA DATA ENGINEER
+    # =========================================================================
+    # ZONA DATA ENGINEER — implementar logica de transformacion
+    # =========================================================================
 
-    # --- Inicio del procesamiento ---
-    
     df = df.copy()
 
     # Limpieza de espacios en todas las columnas de texto
@@ -33,7 +33,9 @@ def process(df: pd.DataFrame) -> list[dict]:
             .apply(lambda x: int(x) if x else None)
         )
 
-    # --- Fin del procesamiento ---
     logger.info(f"Procesamiento completado: {len(df)} registros")
 
+    # =========================================================================
+    # FIN ZONA DATA ENGINEER
+    # =========================================================================
     return df.to_dict(orient="records")

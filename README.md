@@ -402,6 +402,25 @@ waits:
   after_load: 5
 ```
 
+## Zonas del data engineer
+
+Cada archivo marca con `# ZONA DATA ENGINEER` las secciones que debes modificar. El resto es codigo de framework y no requiere cambios.
+
+| Archivo | Zona | Que implementar |
+|---------|------|-----------------|
+| `src/<job>/web_config.yaml` | Completo | `url`, `selectors`, `waits` |
+| `src/<job>/settings.py` | Completo | `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG`, `SKIP_PROCESS` |
+| `src/<job>/scraper.py` | Cuerpo de `scrape()` | Navegacion, manejo de CAPTCHA, extraccion de elementos |
+| `src/<job>/utils.py` | Cuerpo de `parse_record()` | Extraccion campo a campo (texto, atributo, logica especial) |
+| `src/<job>/process.py` | Cuerpo de `process()` + constantes de apoyo | Transformaciones, castings de tipo, columnas derivadas |
+| `src/consolidadores/<nombre>.py` | `STORAGE_CONFIG` + cuerpo de `consolidate()` | Desempaquetar DataFrames y logica de combinacion |
+| `config/pipelines/<nombre>.yaml` | Completo | Jobs, params, bloque `consolidate` |
+| `config/global_settings.py` | Completo (casos excepcionales) | Encoding, separadores, estructura XML, nivel de log |
+
+Lo que **no** toca el data engineer:
+- `src/main.py`
+- `src/shared/` (job_runner, storage, driver_config, logger, utils)
+
 ## Agregar un nuevo proceso
 
 1. Crear `src/<nombre>/scraper.py` con la logica de extraccion

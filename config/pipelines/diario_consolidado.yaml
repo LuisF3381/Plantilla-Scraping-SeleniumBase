@@ -10,6 +10,10 @@
 #   3. Si ambos exitosos → consolida en output/consolidados/consolidado_<fecha>.csv
 # =============================================================================
 
+# =========================================================================
+# ZONA DATA ENGINEER — definir jobs, params y bloque consolidate
+# =========================================================================
+
 name: diario_consolidado
 description: "Scraping diario con consolidacion final de todos los outputs"
 

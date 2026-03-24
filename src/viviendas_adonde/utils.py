@@ -14,6 +14,9 @@ def parse_record(item, selectors: dict, index: int) -> dict:
     Returns:
         dict con todos los campos extraidos del elemento
     """
+    # =========================================================================
+    # ZONA DATA ENGINEER — implementar extraccion campo a campo
+    # =========================================================================
     registro: dict = {"Numero": index}
     for field_name, field_xpath in selectors.items():
         if field_name == "container":

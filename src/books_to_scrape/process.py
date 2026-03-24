@@ -3,6 +3,10 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# =========================================================================
+# ZONA DATA ENGINEER — constantes de apoyo y logica de transformacion
+# =========================================================================
+
 # Mapa de rating textual a valor numerico
 _RATING_MAP = {
     "One": 1,
@@ -54,4 +58,7 @@ def process(df: pd.DataFrame) -> list[dict]:
 
     logger.info(f"Procesamiento completado: {len(df)} registros")
 
+    # =========================================================================
+    # FIN ZONA DATA ENGINEER
+    # =========================================================================
     return df.to_dict(orient="records")

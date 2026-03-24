@@ -24,6 +24,10 @@
 # finalizan exitosamente.
 # =============================================================================
 
+# =========================================================================
+# ZONA DATA ENGINEER — definir jobs, params y bloque consolidate
+# =========================================================================
+
 name: diario
 description: "Scraping diario de catalogo de libros y viviendas"
 

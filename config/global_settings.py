@@ -2,6 +2,11 @@
 Configuracion global de ScrapeCraft.
 Aplica a todos los procesos independientemente del job que se ejecute.
 """
+# =========================================================================
+# ZONA DATA ENGINEER — modificar en casos excepcionales
+# (encoding, separadores CSV, estructura XML, nivel de log, etc.)
+# Los ajustes especificos de cada job van en src/<job>/settings.py
+# =========================================================================
 
 # ============================================
 # CONFIGURACIÓN DE LOGGING
