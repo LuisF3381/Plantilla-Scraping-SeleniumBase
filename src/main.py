@@ -8,22 +8,23 @@ from src.shared import job_runner
 from src.shared.storage import save_data, load_output
 from config import global_settings
 
-# Nombre explicito para que propague a "src" tanto al ejecutar con -m como al importar
-logger = logging.getLogger("src.main")
+# Logger del orquestador en namespace propio para que setup_logger() (que limpia "src")
+# no elimine su handler entre jobs de un pipeline.
+logger = logging.getLogger("orchestrator")
 
 SUPPORTED_FORMATS = {"csv", "json", "xml", "xlsx"}
 
 
 def _setup_console_handler() -> None:
-    """Configura un handler de consola en el logger 'src' para mensajes del
-    orquestador (serie, pipeline). setup_logger() de cada job reemplaza todos
-    los handlers cuando arranca, por lo que este no genera duplicados."""
-    src_logger = logging.getLogger("src")
-    src_logger.setLevel(logging.INFO)
-    src_logger.propagate = False
+    """Configura un handler de consola en el logger 'orchestrator'.
+    Al usar un namespace separado de 'src', setup_logger() de cada job puede
+    reemplazar los handlers de 'src' sin afectar los mensajes del orquestador."""
+    orch_logger = logging.getLogger("orchestrator")
+    orch_logger.setLevel(logging.INFO)
+    orch_logger.propagate = False
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(message)s"))
-    src_logger.addHandler(handler)
+    orch_logger.addHandler(handler)
 
 
 def get_available_jobs() -> list[str]:
@@ -121,9 +122,9 @@ def _run_consolidation(job_outputs: dict[str, Path], consolidate_config: dict) -
     logger.info(f"\nIniciando consolidacion: {module_name}")
     logger.info(f"Fuentes: {list(job_outputs.keys())}")
 
-    fmt = consolidate_config["format"]
+    consolidation_fmt = consolidate_config["format"]
     job_dataframes = {
-        job_name: load_output(filepath, fmt, global_settings.DATA_CONFIG)
+        job_name: load_output(filepath, consolidation_fmt, global_settings.DATA_CONFIG)
         for job_name, filepath in job_outputs.items()
     }
 
@@ -137,8 +138,8 @@ def _run_consolidation(job_outputs: dict[str, Path], consolidate_config: dict) -
     storage_config = consolidator.STORAGE_CONFIG
     output_formats = storage_config.get("output_formats", ["csv"])
 
-    for fmt in output_formats:
-        save_data(result, fmt, global_settings.DATA_CONFIG, storage_config, now)
+    for output_fmt in output_formats:
+        save_data(result, output_fmt, global_settings.DATA_CONFIG, storage_config, now)
 
     logger.info("Consolidacion finalizada")
 

@@ -37,7 +37,8 @@ DATA_CONFIG = {
     # Configuración para XML
     "xml": {
         "root": "registros",
-        "row": "registro"
+        "row": "registro",
+        "encoding": "utf-8"
     },
 
     # Configuración para Excel

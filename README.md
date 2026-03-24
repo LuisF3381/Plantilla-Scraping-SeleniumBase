@@ -273,7 +273,7 @@ scrape() → save_raw() → normalize_in_memory() → process() → save_data() 
 1. Extrae datos de la web y los guarda en `raw/<job>/` como CSV con sufijo timestamp
 2. Normaliza el raw en memoria (`fillna("").astype(str)`) y aplica las transformaciones definidas en `process.py`
 3. Guarda el resultado final en `output/<job>/` en los formatos configurados
-4. Limpia archivos antiguos de `raw/<job>/` segun la politica de retencion configurada — despues de confirmar que el output se guardo correctamente
+4. Limpia archivos antiguos de `raw/<job>/` segun la politica de retencion configurada — siempre, tanto si el job finaliza exitosamente como si falla durante `process()`
 
 ### Flujo sin procesamiento (`skip_process=True`)
 
@@ -317,7 +317,7 @@ Cada ejecucion genera su propio archivo de log: `log/<job>_YYYYMMDD_HHMMSS.log`.
 DATA_CONFIG = {
     "csv":  {"encoding": "utf-8", "separator": ";", "index": False},
     "json": {"indent": 2, "force_ascii": False, "orient": "records"},
-    "xml":  {"root": "registros", "row": "registro"},
+    "xml":  {"root": "registros", "row": "registro", "encoding": "utf-8"},
     "xlsx": {"sheet_name": "Datos", "index": False}
 }
 ```
@@ -442,7 +442,7 @@ def process(df: pd.DataFrame) -> list[dict]:
 El raw intermedio se persiste siempre como `str`. El output final preserva los tipos que `process.py` asigne:
 
 - **Al escribir raw** (`save_raw`): se aplica `df.fillna("").astype(str)` — los `NaN` reales se rellenan con `""` antes de convertir a string, preservando el literal `"nan"` como dato valido en campos de texto
-- **Normalizacion en memoria**: tras `save_raw`, el raw se normaliza en memoria con `pd.DataFrame(datos).fillna("").astype(str)` — todas las columnas llegan a `process()` como `str` sin un ciclo de lectura a disco adicional; `load_raw` queda exclusivo para el flujo `--reprocess`
+- **Normalizacion en memoria**: tras `save_raw`, el raw se normaliza en memoria con `pd.DataFrame(datos).fillna("").astype(str)` — todas las columnas llegan a `process()` como `str` sin un ciclo de lectura a disco adicional; `load_raw` queda exclusivo para el flujo `--reprocess`, donde retorna directamente un `pd.DataFrame` listo para pasar a `process()`
 - **Al escribir output** (`save_data`): se preservan los tipos que `process.py` asigno (`float`, `int`, `datetime`, etc.) — en JSON los numeros se guardan como numeros, en XLSX las celdas mantienen su tipo
 
 Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danados se preserven exactamente como llegan del scraper. La conversion de tipos es responsabilidad exclusiva de `process.py`.
@@ -453,7 +453,8 @@ Esto garantiza que valores como `"001"`, `"N/A"`, `"1.500,00"` o registros danad
 
 ```python
 def load_web_config(job_name: str) -> dict:
-    """Carga la configuracion de la web desde src/<job_name>/web_config.yaml."""
+    """Carga y valida la configuracion de la web desde src/<job_name>/web_config.yaml.
+    Lanza ValueError si faltan las claves requeridas (url, selectors, waits)."""
 
 def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> dict[str, Path]:
     """
@@ -486,8 +487,8 @@ def load_output(filepath: Path, format: str, data_config: dict) -> pd.DataFrame:
     """Lee un archivo de output y lo retorna como DataFrame usando la config correcta de DATA_CONFIG.
     Usada por el runner para preparar los DataFrames antes de pasarlos al consolidador."""
 
-def load_raw(suffix, raw_config, data_config) -> list[dict]:
-    """Lee un raw existente y lo retorna como lista de dicts sin transformar. Lee todo como str."""
+def load_raw(suffix, raw_config, data_config) -> pd.DataFrame:
+    """Lee un raw existente y lo retorna como DataFrame sin transformar. Lee todo como str."""
 
 def cleanup_raw(raw_config) -> None:
     """Limpia archivos raw segun la politica de retencion configurada."""

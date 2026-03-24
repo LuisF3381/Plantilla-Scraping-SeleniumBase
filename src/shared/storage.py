@@ -23,11 +23,11 @@ def _write_df(df: pd.DataFrame, filepath: Path, format: str, config: dict, strin
     if stringify:
         df = df.fillna("").astype(str)
     if format == "csv":
-        df.to_csv(filepath, index=False, encoding=config.get("encoding", "utf-8"), sep=config.get("separator", ","))
+        df.to_csv(filepath, index=config.get("index", False), encoding=config.get("encoding", "utf-8"), sep=config.get("separator", ","))
     elif format == "json":
         df.to_json(filepath, orient=config.get("orient", "records"), indent=config.get("indent", 2), force_ascii=config.get("force_ascii", False))
     elif format == "xml":
-        df.to_xml(filepath, index=False, root_name=config.get("root", "registros"), row_name=config.get("row", "registro"))
+        df.to_xml(filepath, index=False, root_name=config.get("root", "registros"), row_name=config.get("row", "registro"), encoding=config.get("encoding", "utf-8"))
     elif format == "xlsx":
         df.to_excel(filepath, index=config.get("index", False), sheet_name=config.get("sheet_name", "Datos"))
     else:
@@ -151,7 +151,8 @@ def save_raw(datos: pd.DataFrame, raw_config: dict, data_config: dict, now: date
     suffix: str = now.strftime("%Y%m%d_%H%M%S")
     filepath = raw_folder / f"{filename}_{suffix}.{format}"
 
-    _write_df(datos, filepath, format, data_config[format], stringify=True)
+    # stringify=False: el DataFrame ya llega normalizado a string desde job_runner
+    _write_df(datos, filepath, format, data_config[format], stringify=False)
     logger.info(f"Raw guardado en {filepath} ({len(datos)} registros)")
 
     return suffix
@@ -175,9 +176,9 @@ def load_output(filepath: Path, format: str, data_config: dict) -> pd.DataFrame:
     return _read_df(filepath, format, data_config[format])
 
 
-def load_raw(suffix: str, raw_config: dict, data_config: dict) -> list[dict]:
+def load_raw(suffix: str, raw_config: dict, data_config: dict) -> pd.DataFrame:
     """
-    Lee un archivo raw y lo retorna como lista de diccionarios sin transformaciones.
+    Lee un archivo raw y lo retorna como DataFrame sin transformaciones.
 
     Args:
         suffix:      Sufijo timestamp de la ejecucion (ej: "20260312_143052")
@@ -185,12 +186,12 @@ def load_raw(suffix: str, raw_config: dict, data_config: dict) -> list[dict]:
         data_config: Diccionario con configuraciones de formato (DATA_CONFIG)
 
     Returns:
-        list[dict]: Datos del raw sin transformar
+        pd.DataFrame: Datos del raw sin transformar
     """
     filename: str = raw_config["filename"]
     extension: str = raw_config["format"]
     filepath = Path(raw_config["raw_folder"]) / f"{filename}_{suffix}.{extension}"
-    return _read_df(filepath, extension, data_config[extension]).to_dict(orient="records")
+    return _read_df(filepath, extension, data_config[extension])
 
 
 def cleanup_raw(raw_config: dict) -> None:

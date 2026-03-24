@@ -39,11 +39,30 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
+def _validate_web_config(config: dict, job_name: str) -> None:
+    """Valida que web_config.yaml tenga las claves y tipos requeridos."""
+    required = {"url", "selectors", "waits"}
+    missing = required - config.keys()
+    if missing:
+        raise ValueError(
+            f"web_config.yaml del job '{job_name}' le faltan claves requeridas: {sorted(missing)}"
+        )
+    if not isinstance(config["selectors"], dict) or not config["selectors"]:
+        raise ValueError(
+            f"web_config.yaml del job '{job_name}': 'selectors' debe ser un dict no vacio."
+        )
+    if not isinstance(config["waits"], dict):
+        raise ValueError(
+            f"web_config.yaml del job '{job_name}': 'waits' debe ser un dict."
+        )
+
+
 def load_web_config(job_name: str) -> dict:
-    """Carga la configuracion de la web desde el archivo YAML del job."""
+    """Carga y valida la configuracion de la web desde el archivo YAML del job."""
     path = _PROJECT_ROOT / "src" / job_name / "web_config.yaml"
     with open(path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
+    _validate_web_config(config, job_name)
     logger.info(f"Configuracion cargada: {config['url']}")
     return config
 
@@ -91,11 +110,11 @@ def _run_full(scrape_fn, process_fn, settings, job_name: str, now: datetime, par
 def _run_reprocess(suffix: str, process_fn, settings) -> list[dict]:
     """Flujo reprocess: omite el scraping y reprocesa un raw existente."""
     logger.info(f"Iniciando reprocesamiento: sufijo {suffix}")
-    df = pd.DataFrame(load_raw(
+    df = load_raw(
         suffix=suffix,
         raw_config=settings.RAW_CONFIG,
         data_config=global_settings.DATA_CONFIG,
-    ))
+    )
     return process_fn(df)
 
 
@@ -137,6 +156,7 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
 
     params = params or {}
 
+    output_paths: dict[str, Path] = {}
     try:
         if args.reprocess:
             processed = _run_reprocess(args.reprocess, process_fn, settings)
@@ -145,13 +165,14 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
 
         output_paths = _save_output(processed, settings, now)
 
-        # Bug fix: cleanup_raw se ejecuta DESPUES de guardar el output para evitar
-        # perdida de datos si _save_output falla (disco lleno, permisos, etc.)
-        if not args.reprocess:
-            cleanup_raw(settings.RAW_CONFIG)
-
-        return output_paths
-
     except Exception as e:
         logger.error(f"Error durante la ejecucion: {e}", exc_info=True)
         raise
+
+    finally:
+        # cleanup_raw corre siempre (exito o fallo) para que la politica de retencion
+        # se aplique aunque el job falle. En --reprocess no hay raw nuevo que gestionar.
+        if not args.reprocess:
+            cleanup_raw(settings.RAW_CONFIG)
+
+    return output_paths

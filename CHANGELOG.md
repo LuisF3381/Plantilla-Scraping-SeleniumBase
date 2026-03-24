@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.41.0] - 2026-03-24
+
+### Fixed
+- `src/main.py` `_run_consolidation()`: variable shadowing — la variable `fmt` del loop `for fmt in output_formats` sobreescribia la variable exterior `fmt = consolidate_config["format"]`; renombradas a `consolidation_fmt` y `output_fmt` respectivamente
+- `src/shared/storage.py` `load_raw()`: eliminada doble conversion innecesaria `DataFrame → list[dict] → DataFrame` — la funcion ahora retorna `pd.DataFrame` directamente en lugar de `list[dict]`; `_run_reprocess` actualizado para consumirlo sin envoltura adicional
+- `src/shared/storage.py` `save_raw()`: eliminado doble `astype(str)` — el DataFrame ya llega normalizado (string-first) desde `job_runner`; `_write_df` se invoca con `stringify=False`
+- `src/main.py` logger del orquestador: los mensajes de pipeline (`[1/2] Iniciando job`, `Serie finalizada`, etc.) se escribian en el archivo de log del ultimo job ejecutado porque `setup_logger()` eliminaba todos los handlers de `"src"`, incluyendo el del orquestador; el logger de `main.py` pasa a usar el namespace `"orchestrator"` (separado de `"src"`) y `_setup_console_handler` lo configura sobre ese mismo logger — `setup_logger()` nunca lo toca
+- `src/shared/job_runner.py` `run()`: `cleanup_raw()` no se ejecutaba si el job fallaba durante `process()`, permitiendo que los archivos raw se acumularan sin limite; movido a bloque `finally` para que la politica de retencion se aplique siempre, tanto en exito como en fallo
+
+### Added
+- `src/shared/job_runner.py` `_validate_web_config()`: nueva funcion privada que valida las claves requeridas de `web_config.yaml` antes de ejecutar el scraper — verifica que existan `url`, `selectors` (dict no vacio) y `waits` (dict); lanza `ValueError` con mensaje descriptivo si falta alguna; el selector `container` dentro de `selectors` no se valida intencionalmente (es decision del job usarlo o no); llamada desde `load_web_config()`
+
+### Changed
+- `src/shared/storage.py` `_write_df()`: el parametro `index` de CSV cambia de `False` hardcodeado a `config.get("index", False)` — consistente con el comportamiento de XLSX que ya lo leia de la config
+- `config/global_settings.py` `DATA_CONFIG["xml"]`: agregada clave `"encoding": "utf-8"` — `_write_df` ahora la pasa a `df.to_xml()`, igualando el encoding de escritura al de lectura (que ya usaba `config.get("encoding", "utf-8")` en `_read_df`)
+
 ## [0.40.0] - 2026-03-24
 
 ### Added
