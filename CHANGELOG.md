@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.43.0] - 2026-03-25
+
+### Added
+- `latest/` — nueva carpeta que actua como espejo de la ultima ejecucion de cada job o pipeline; proporciona rutas fijas y estables para procesos downstream sin depender del `naming_mode` configurado en cada job
+- `src/shared/storage.py` `clear_latest(folder)`: borra y recrea `latest/<folder>/` al inicio de cada ejecucion garantizando un estado limpio
+- `src/shared/storage.py` `copy_to_latest(folder, output_paths, log_path, base_filename)`: copia los outputs con nombre fijo (`<filename>.<ext>`) y el log de la ejecucion como `run.log` a `latest/<folder>/`; si el job fallo y no hay outputs, solo se copia el log para mantener trazabilidad
+- `src/shared/storage.py` `merge_logs_to_latest(folder, log_paths)`: concatena los logs de multiples jobs en un unico `latest/<folder>/run.log` con separadores por seccion; usado exclusivamente por pipelines con consolidacion
+- `src/shared/logger.py` `current_log_path`: variable de modulo que registra la ruta del archivo de log activo tras cada llamada a `setup_logger()`; permite al framework copiar el log correcto a `latest/` sin acoplamiento entre modulos
+- `src/shared/logger.py` `flush_log()`: fuerza el flush de todos los handlers del logger `"src"` antes de copiar el archivo de log a `latest/`
+
+### Changed
+- `src/shared/job_runner.py` `run()`: nuevo parametro `update_latest=True` — cuando es `True` (default) limpia y actualiza `latest/<job>/` al inicio y al final de cada ejecucion (tanto en exito como en fallo); cuando es `False` delega la gestion de `latest/` al orquestador del pipeline consolidado
+- `src/main.py` `_run_series()`: nuevo parametro `pipeline_name` — en pipelines con consolidacion activa gestiona un unico `latest/<pipeline_name>/` con el output consolidado y los logs de todos los jobs concatenados; los jobs individuales no escriben en `latest/` en este modo (`update_latest=False`)
+- `src/main.py` `_run_consolidation()`: pasa de retornar `None` a retornar `dict[str, Path]` con el mapa formato → ruta del archivo consolidado; permite al orquestador copiar el output a `latest/` sin reimportar el modulo consolidador
+- `src/main.py` `_load_pipeline()`: pasa de retornar `tuple[list, dict | None]` a `tuple[list, dict | None, str | None]` incluyendo el nombre del pipeline; usado para nombrar la carpeta en `latest/` en pipelines consolidados
+- `src/shared/logger.py` `setup_logger()`: actualiza `current_log_path` en cada llamada para que el framework siempre tenga acceso a la ruta del log activo
+
 ## [0.42.0] - 2026-03-24
 
 ### Added

@@ -58,6 +58,17 @@ ScrapeCraft/
 ├── raw/
 │   ├── viviendas_adonde/
 │   └── books_to_scrape/
+├── latest/                            # Espejo de la ultima ejecucion (rutas fijas para downstream)
+│   ├── books_to_scrape/               #   generado por --job o --pipeline sin consolidar
+│   │   ├── books.csv
+│   │   ├── books.json
+│   │   └── run.log
+│   ├── viviendas_adonde/
+│   │   ├── viviendas.csv
+│   │   └── run.log
+│   └── diario_consolidado/            #   generado por --pipeline con consolidar
+│       ├── consolidado.csv
+│       └── run.log                    #   logs de todos los jobs concatenados
 ├── requirements.txt
 ├── CHANGELOG.md
 └── LICENSE
@@ -83,9 +94,11 @@ main.py (Dispatcher CLI)
                                 │   └── scrape()        # Extrae datos de la web
                                 │
                                 ├── shared/storage.py
-                                │   ├── save_raw()      # Guarda raw en raw/<job>/
-                                │   ├── cleanup_raw()   # Aplica politica de retencion
-                                │   └── save_data()     # Exporta a output/<job>/
+                                │   ├── save_raw()          # Guarda raw en raw/<job>/
+                                │   ├── cleanup_raw()       # Aplica politica de retencion
+                                │   ├── save_data()         # Exporta a output/<job>/
+                                │   ├── clear_latest()      # Limpia latest/<job>/ antes de cada run
+                                │   └── copy_to_latest()    # Copia output + log a latest/<job>/
                                 │
                                 └── process.py
                                     └── process()       # Transforma raw → procesado
@@ -96,9 +109,9 @@ main.py (Dispatcher CLI)
 | Modulo | Responsabilidad |
 |--------|-----------------|
 | `job_runner.py` | Orquestacion ETL generica: `_run_full`, `_run_reprocess`, `_save_output`, `run` |
-| `storage.py` | Persistencia: raw, cleanup, construir rutas, exportar en multiples formatos, cargar outputs para consolidacion |
+| `storage.py` | Persistencia: raw, cleanup, construir rutas, exportar en multiples formatos, cargar outputs para consolidacion, gestion de `latest/` |
 | `driver_config.py` | `create_driver(config)`: inicializa el navegador con opciones anti-deteccion |
-| `logger.py` | Sistema de logging dual (archivo + consola) |
+| `logger.py` | Sistema de logging dual (archivo + consola); expone `current_log_path` y `flush_log()` para la gestion de `latest/` |
 | `utils.py` | Funciones auxiliares de extraccion reutilizables: `safe_get_text`, `safe_get_attr` |
 
 ### Modulos consolidadores (`src/consolidadores/`)
@@ -355,6 +368,53 @@ raw/viviendas_adonde/
 └── viviendas_20260312_143052.csv   ← sufijo: 20260312_143052
 ```
 
+## Latest — rutas fijas para procesos downstream
+
+Cada ejecucion actualiza automaticamente la carpeta `latest/` con los archivos de la ultima ejecucion. Esto permite que cualquier proceso externo lea siempre desde una ruta fija sin depender del `naming_mode` ni del timestamp del run.
+
+### Estructura
+
+```
+latest/
+  <job_name>/              # --job o --pipeline sin consolidar
+    <filename>.<ext>       # uno por cada formato en output_formats
+    run.log                # log de esa ejecucion
+  <pipeline_name>/         # --pipeline con consolidar
+    <filename>.<ext>       # solo el output consolidado
+    run.log                # logs de todos los jobs concatenados
+```
+
+### Comportamiento por modo
+
+| Modo | Carpeta en latest/ | Exito | Fallo |
+|------|--------------------|-------|-------|
+| `--job` | `latest/<job>/` | output(s) + `run.log` | solo `run.log` |
+| `--pipeline` sin consolidar | `latest/<job>/` por cada job | output(s) + `run.log` | solo `run.log` |
+| `--pipeline` con consolidar | `latest/<pipeline_name>/` | output consolidado + `run.log` (logs concatenados) | solo `run.log` (logs concatenados) |
+| `--reprocess` | `latest/<job>/` | output(s) + `run.log` | solo `run.log` |
+
+**Reglas:**
+
+- La carpeta `latest/<X>/` se borra y recrea al inicio de cada ejecucion — nunca quedan archivos de runs anteriores
+- Si el job falla no se escribe ningun output en `latest/`, pero el log siempre se copia para mantener trazabilidad
+- En pipelines con consolidacion los jobs individuales **no** escriben en `latest/` — solo escribe el consolidador al final
+- En pipelines sin consolidacion cada job gestiona su propio `latest/<job>/` de forma independiente; el fallo de un job no afecta al `latest/` de los demas
+- El `--reprocess` borra y actualiza unicamente `latest/<job>/` del job que se esta reprocesando
+
+### Nombres de archivo en latest/
+
+Los archivos en `latest/` usan siempre el nombre base configurado en `STORAGE_CONFIG["filename"]` sin sufijo de fecha ni timestamp:
+
+```
+# output/<job>/ (segun naming_mode configurado)
+output/books_to_scrape/books_20260325.csv
+
+# latest/<job>/ (siempre igual, ruta fija)
+latest/books_to_scrape/books.csv
+```
+
+Esto garantiza que la ruta `latest/<job>/<filename>.<ext>` sea invariante entre ejecuciones y conocida de antemano por el proceso downstream.
+
 ## Configuracion
 
 ### Global (`config/global_settings.py`)
@@ -532,15 +592,18 @@ def load_web_config(job_name: str) -> dict:
     """Carga y valida la configuracion de la web desde src/<job_name>/web_config.yaml.
     Lanza ValueError si faltan las claves requeridas (url, selectors, waits)."""
 
-def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> dict[str, Path]:
+def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None, update_latest: bool = True) -> dict[str, Path]:
     """
     Punto de entrada generico para cualquier job. Llamado directamente desde main.py.
     params: dict nativo con los parametros definidos en el pipeline YAML (vacio si no se definio ninguno).
+    update_latest: si True (default) gestiona latest/<job>/ al inicio y al final de la ejecucion.
+                   El orquestador de pipelines consolidados lo pasa como False para gestionar
+                   su propio latest/<pipeline_name>/ centralizado.
     Retorna mapa de formato -> ruta del archivo guardado (ej: {"csv": Path(...), "json": Path(...)}).
 
-    Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → cleanup_raw → save_data
-    Sin proceso:       scrape → save_raw → normalize_in_memory → cleanup_raw → save_data
-    Flujo reprocess:   load_raw → process(df) → save_data
+    Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → cleanup_raw → save_data → copy_to_latest
+    Sin proceso:       scrape → save_raw → normalize_in_memory → cleanup_raw → save_data → copy_to_latest
+    Flujo reprocess:   load_raw → process(df) → save_data → copy_to_latest
     """
 ```
 
@@ -572,6 +635,17 @@ def cleanup_raw(raw_config) -> None:
 def build_filepath(storage_config, format, now=None) -> Path:
     """Construye la ruta del archivo segun el modo de nombrado configurado.
     now: datetime opcional; si se omite se usa datetime.now()."""
+
+def clear_latest(folder: str) -> None:
+    """Borra y recrea latest/<folder>/ antes de cada ejecucion para garantizar un estado limpio."""
+
+def copy_to_latest(folder: str, output_paths: dict[str, Path], log_path: Path | None, base_filename: str | None = None) -> None:
+    """Copia los outputs a latest/<folder>/ renombrandolos a <base_filename>.<ext> (ruta fija).
+    Copia el log como run.log. Si output_paths esta vacio (fallo), solo copia el log."""
+
+def merge_logs_to_latest(folder: str, log_paths: list[Path]) -> None:
+    """Concatena multiples logs en latest/<folder>/run.log con separadores por seccion.
+    Usado por pipelines con consolidacion para unificar los logs de todos los jobs."""
 ```
 
 ### `src/shared/utils.py`

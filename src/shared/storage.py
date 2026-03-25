@@ -1,4 +1,5 @@
 import logging
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -240,3 +241,66 @@ def cleanup_raw(raw_config: dict) -> None:
             logger.info(f"Raw eliminado: {filepath}")
         except OSError as e:
             logger.warning(f"No se pudo eliminar el raw {filepath}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Latest — espejo de la ultima ejecucion para consumo externo
+# ---------------------------------------------------------------------------
+
+
+def clear_latest(folder: str) -> None:
+    """Borra y recrea latest/<folder>/ para garantizar un estado limpio antes de cada ejecucion."""
+    latest_path = Path("latest") / folder
+    if latest_path.exists():
+        shutil.rmtree(latest_path)
+    latest_path.mkdir(parents=True)
+
+
+def copy_to_latest(folder: str, output_paths: dict[str, Path], log_path: Path | None, base_filename: str | None = None) -> None:
+    """
+    Copia los archivos de output y el log a latest/<folder>/.
+
+    Args:
+        folder:        Nombre de la subcarpeta en latest/ (job_name o pipeline_name).
+        output_paths:  Mapa formato -> Path del archivo generado. Puede estar vacio si hubo fallo.
+        log_path:      Ruta del log de la ejecucion. Se copia siempre como run.log.
+        base_filename: Nombre base para renombrar los outputs (ej: "books" -> "books.csv").
+                       Si es None se conserva el nombre original del archivo.
+    """
+    latest_path = Path("latest") / folder
+    latest_path.mkdir(parents=True, exist_ok=True)
+
+    for fmt, filepath in output_paths.items():
+        if filepath.exists():
+            dest_name = f"{base_filename}.{fmt}" if base_filename else filepath.name
+            shutil.copy2(filepath, latest_path / dest_name)
+            logger.info(f"Latest actualizado: {latest_path / dest_name}")
+
+    if log_path and log_path.exists():
+        shutil.copy2(log_path, latest_path / "run.log")
+        logger.info(f"Log copiado a latest: {latest_path / 'run.log'}")
+
+
+def merge_logs_to_latest(folder: str, log_paths: list[Path]) -> None:
+    """
+    Concatena multiples archivos de log en latest/<folder>/run.log.
+    Inserta un separador con el nombre del archivo entre cada seccion.
+
+    Args:
+        folder:    Nombre de la subcarpeta en latest/ (pipeline_name).
+        log_paths: Lista de rutas de log a concatenar, en orden de ejecucion.
+    """
+    latest_path = Path("latest") / folder
+    latest_path.mkdir(parents=True, exist_ok=True)
+    merged_log = latest_path / "run.log"
+
+    with open(merged_log, "w", encoding="utf-8") as out:
+        for log_path in log_paths:
+            if log_path and log_path.exists():
+                out.write(f"{'='*60}\n")
+                out.write(f"LOG: {log_path.name}\n")
+                out.write(f"{'='*60}\n")
+                out.write(log_path.read_text(encoding="utf-8"))
+                out.write("\n")
+
+    logger.info(f"Log consolidado en: {merged_log}")

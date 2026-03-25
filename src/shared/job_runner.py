@@ -5,8 +5,9 @@ import yaml
 from datetime import datetime
 from pathlib import Path
 from src.shared.driver_config import create_driver
+from src.shared import logger as logger_module
 from src.shared.logger import setup_logger
-from src.shared.storage import save_data, save_raw, cleanup_raw, load_raw  # load_raw solo para --reprocess
+from src.shared.storage import save_data, save_raw, cleanup_raw, load_raw, clear_latest, copy_to_latest
 from config import global_settings
 
 logger = logging.getLogger(__name__)
@@ -136,23 +137,28 @@ def _save_output(processed: list[dict], settings, now: datetime) -> dict[str, Pa
 # Punto de entrada generico (llamado desde app_job.py de cada job)
 # ---------------------------------------------------------------------------
 
-def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None) -> dict[str, Path]:
+def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None, update_latest: bool = True) -> dict[str, Path]:
     """
     Punto de entrada generico para cualquier job.
 
     Args:
-        args:       Argumentos CLI (args.reprocess: str | None)
-        scrape_fn:  Funcion scrape() del job
-        process_fn: Funcion process() del job
-        settings:   Modulo de configuracion del job
-        job_name:   Nombre del job (nombre de la carpeta en src/)
-        params:     Parametros del job definidos en el pipeline YAML (dict nativo)
+        args:           Argumentos CLI (args.reprocess: str | None)
+        scrape_fn:      Funcion scrape() del job
+        process_fn:     Funcion process() del job
+        settings:       Modulo de configuracion del job
+        job_name:       Nombre del job (nombre de la carpeta en src/)
+        params:         Parametros del job definidos en el pipeline YAML (dict nativo)
+        update_latest:  Si True, gestiona latest/<job_name>/ al inicio y al final.
+                        Pasar False cuando el pipeline consolidado gestiona su propio latest.
 
     Returns:
         dict[str, Path]: Mapa de formato -> ruta del archivo guardado (ej: {"csv": Path(...)}).
     """
     now = datetime.now()
     setup_logger(job_name, now, **global_settings.LOG_CONFIG)
+
+    if update_latest:
+        clear_latest(job_name)
 
     params = params or {}
 
@@ -174,5 +180,10 @@ def run(args: argparse.Namespace, scrape_fn, process_fn, settings, job_name: str
         # se aplique aunque el job falle. En --reprocess no hay raw nuevo que gestionar.
         if not args.reprocess:
             cleanup_raw(settings.RAW_CONFIG)
+
+        if update_latest:
+            logger_module.flush_log()
+            base_filename = settings.STORAGE_CONFIG.get("filename")
+            copy_to_latest(job_name, output_paths, logger_module.current_log_path, base_filename)
 
     return output_paths
