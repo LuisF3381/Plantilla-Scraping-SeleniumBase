@@ -10,6 +10,8 @@ ScrapeCraft busca ser un punto de partida para cualquier persona que quiera apre
 - **Flexible**: Soporta multiples procesos de scraping y multiples formatos de salida (CSV, JSON, XML, Excel)
 - **Robusta**: Incluye sistema de logging, manejo de errores y evasion de deteccion
 
+> **Nuevo proyecto?** Usa el [ScrapeCraft Generator](../scrapecraft-generator/) para generar la estructura completa de tu proyecto de forma interactiva, sin copiar ni modificar esta plantilla manualmente.
+
 ## Estructura
 
 ```
@@ -115,13 +117,40 @@ Cada consolidador define su propio `STORAGE_CONFIG` y una funcion `consolidate(j
 | `process.py` | Transformacion de datos entre el raw y el guardado final |
 | `utils.py` | `parse_record()` con logica especifica del job; importa `safe_get_text`/`safe_get_attr` de shared |
 
+## Requisitos previos
+
+- Python **3.10 o superior** (el codigo usa union types `X | Y` disponibles desde 3.10)
+- Google Chrome instalado (SeleniumBase gestiona el chromedriver automaticamente)
+
 ## Instalacion
 
+**1. Clonar o descargar el repositorio**
+
 ```bash
-git clone https://github.com/tu-usuario/ScrapeCraft.git
-cd ScrapeCraft
+git clone <url-del-repositorio>
+cd Plantilla-Scraping-SeleniumBase
+```
+
+**2. Crear y activar el entorno virtual**
+
+```bash
+# Crear
+python -m venv venv
+
+# Activar en Windows
+venv\Scripts\activate
+
+# Activar en macOS / Linux
+source venv/bin/activate
+```
+
+**3. Instalar dependencias**
+
+```bash
 pip install -r requirements.txt
 ```
+
+> Todos los comandos del proyecto deben ejecutarse desde la **raiz del repositorio** con el entorno virtual activo.
 
 ## Uso
 
@@ -130,22 +159,50 @@ pip install -r requirements.txt
 python -m src.main --list
 
 # --- Job individual ---
+python -m src.main --job books_to_scrape
 python -m src.main --job viviendas_adonde
+
+# --- Reprocesar raw existente sin volver a scrapear ---
 python -m src.main --job books_to_scrape --reprocess 20260313_142546
 
-# --- Ejecucion en serie ---
+# --- Ejecucion en serie (pipeline) ---
 python -m src.main --pipeline config/pipelines/diario.yaml
 
 # --- Ejecucion en serie con consolidacion ---
 python -m src.main --pipeline config/pipelines/diario_consolidado.yaml
-
-# --- Tests ---
-pytest tests/ -v
-pytest tests/test_global.py -v
-pytest tests/test_pipelines.py -v
-pytest tests/books_to_scrape/ -v
-pytest tests/viviendas_adonde/ -v
 ```
+
+## Tests
+
+Los tests estan divididos en dos grupos segun si requieren o no un navegador:
+
+**Tests de configuracion** — rapidos, sin browser:
+
+```bash
+# Todos los tests de configuracion y pipeline (recomendado para validacion rapida)
+pytest tests/test_global.py tests/test_pipelines.py -v
+
+# Solo configuracion global
+pytest tests/test_global.py -v
+
+# Solo pipelines
+pytest tests/test_pipelines.py -v
+```
+
+**Tests de job** — incluyen un test que abre el browser en modo headless:
+
+```bash
+# Job books_to_scrape
+pytest tests/books_to_scrape/ -v -s
+
+# Job viviendas_adonde
+pytest tests/viviendas_adonde/ -v -s
+
+# Todos los tests (configuracion + todos los jobs)
+pytest tests/ -v -s
+```
+
+> El test `test_driver_instance_created_with_settings_file` abre Chrome en modo headless para verificar que el driver se inicializa correctamente. Requiere Chrome instalado.
 
 ## Ejecucion en serie
 
@@ -626,14 +683,15 @@ Valida automaticamente todos los `.yaml` presentes en `config/pipelines/` — no
 | `TestRawConfig` | `test_raw_config_format_is_valid` | Verifica que el formato raw es uno de los soportados |
 | `TestRawConfig` | `test_raw_config_retention_mode_is_valid` | Valida modo de retencion |
 
-## Requisitos
+## Dependencias
 
-- Python 3.8+
-- SeleniumBase
-- pandas
-- pyyaml
-- pytest
-- openpyxl
+| Paquete | Uso |
+|---|---|
+| `seleniumbase` | Automatizacion de navegador con soporte anti-deteccion |
+| `pandas` | Manipulacion y exportacion de datos |
+| `pyyaml` | Lectura de archivos de configuracion YAML |
+| `pytest` | Framework de tests |
+| `openpyxl` | Exportacion a Excel (.xlsx) |
 
 ## Licencia
 
