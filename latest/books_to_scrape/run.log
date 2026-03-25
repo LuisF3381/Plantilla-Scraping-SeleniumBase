@@ -1,14 +1,19 @@
-2026-03-25 13:01:38,449 - INFO - Iniciando scraper...
-2026-03-25 13:01:38,449 - INFO - Parametros recibidos: {'categoria': 'mystery', 'pagina': 1}
-2026-03-25 13:01:38,452 - INFO - Configuracion cargada: http://books.toscrape.com/
-2026-03-25 13:01:40,649 - INFO - Driver inicializado correctamente
-2026-03-25 13:01:42,047 - INFO - Pagina cargada correctamente
-2026-03-25 13:01:43,069 - INFO - Encontrados 20 libros
-2026-03-25 13:01:47,127 - INFO - Raw guardado en raw\books_to_scrape\books_20260325_130138.csv (20 registros)
-2026-03-25 13:01:47,129 - INFO - Si el proceso falla, puedes reprocesar con: --reprocess 20260325_130138
-2026-03-25 13:01:47,145 - INFO - Procesamiento completado: 20 registros
-2026-03-25 13:01:47,158 - INFO - Datos guardados en output\books_to_scrape\books_20260325.csv (20 registros)
-2026-03-25 13:01:47,165 - INFO - Datos guardados en output\books_to_scrape\books_20260325.json (20 registros)
-2026-03-25 13:01:47,165 - INFO - Proceso finalizado
-2026-03-25 13:01:47,178 - INFO - Latest actualizado: latest\books_to_scrape\books.csv
-2026-03-25 13:01:47,187 - INFO - Latest actualizado: latest\books_to_scrape\books.json
+2026-03-25 13:57:33,390 - INFO - Iniciando scraper...
+2026-03-25 13:57:33,393 - INFO - Configuracion cargada: http://books.toscrape.com/
+2026-03-25 13:57:35,374 - INFO - Driver inicializado correctamente
+2026-03-25 13:57:36,250 - INFO - Pagina cargada correctamente
+2026-03-25 13:57:37,287 - INFO - Encontrados 20 libros
+2026-03-25 13:57:41,146 - INFO - Raw guardado en raw\books_to_scrape\books_20260325_135733.csv (20 registros)
+2026-03-25 13:57:41,147 - INFO - Si el proceso falla, puedes reprocesar con: --reprocess 20260325_135733
+2026-03-25 13:57:41,155 - INFO - Procesamiento completado: 20 registros
+2026-03-25 13:57:41,163 - INFO - Ejecutando validaciones...
+2026-03-25 13:57:41,164 - ERROR - Error durante la ejecucion: Validacion fallida (1 error(es)):
+  - El numero de registros es insuficiente: se obtuvieron 20, se esperaban al menos 100
+Traceback (most recent call last):
+  File "C:\Users\leis2\OneDrive\Escritorio1\Plantilla_Definitiva\Plantilla-Scraping-SeleniumBase\src\shared\job_runner.py", line 194, in run
+    _run_validate(validate_fn, processed)
+  File "C:\Users\leis2\OneDrive\Escritorio1\Plantilla_Definitiva\Plantilla-Scraping-SeleniumBase\src\shared\job_runner.py", line 126, in _run_validate
+    raise ValueError(
+ValueError: Validacion fallida (1 error(es)):
+  - El numero de registros es insuficiente: se obtuvieron 20, se esperaban al menos 100
+2026-03-25 13:57:41,170 - INFO - Raw eliminado: raw\books_to_scrape\books_20260325_125413.csv

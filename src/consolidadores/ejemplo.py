@@ -65,4 +65,33 @@ def consolidate(job_dataframes: dict[str, pd.DataFrame], params: dict = None) ->
 
     consolidado = pd.concat([books_df, viviendas_df], ignore_index=True)
 
+    # =========================================================================
+    # FIN ZONA DATA ENGINEER (2/2)
+    # =========================================================================
     return consolidado.to_dict(orient="records")
+
+
+def validate(df: pd.DataFrame) -> list[str]:
+    """
+    Valida el DataFrame consolidado antes de guardarlo.
+    Funcion opcional — si no se define, la validacion se omite.
+    Retorna una lista de errores encontrados.
+    Lista vacia significa que la validacion fue exitosa.
+
+    Args:
+        df: DataFrame con los datos consolidados por consolidate()
+
+    Returns:
+        list[str]: Lista de mensajes de error. Vacia si la validacion es exitosa.
+    """
+    errors: list[str] = []
+
+    # =========================================================================
+    # ZONA GOBIERNO DE DATOS
+    # =========================================================================
+
+    # =========================================================================
+    # FIN ZONA GOBIERNO DE DATOS
+    # =========================================================================
+
+    return errors

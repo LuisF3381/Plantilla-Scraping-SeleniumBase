@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.44.0] - 2026-03-25
+
+### Added
+- `src/<job>/validate.py` (x2, nuevos): archivo obligatorio por job con la funcion `validate(df) -> list[str]`; contiene la ZONA GOBIERNO DE DATOS lista para que el equipo de gobierno implemente sus validaciones; lista vacia = validacion exitosa, lista con mensajes = fallo con errores descriptivos
+- `src/shared/job_runner.py` `_run_validate(validate_fn, processed)`: nueva funcion interna que ejecuta `validate()` sobre el DataFrame procesado antes de guardar; lanza `ValueError` con todos los mensajes de error si la validacion falla
+- `src/consolidadores/ejemplo.py` `validate(df)`: funcion opcional de validacion para el consolidador con ZONA GOBIERNO DE DATOS; el framework la detecta con `hasattr` y la ejecuta si existe, antes de guardar el output consolidado
+
+### Changed
+- `src/shared/job_runner.py` `run()`: nuevo parametro `validate_fn`; `_run_validate()` se ejecuta despues de `process()` y antes de `save_data()` — si falla, no se guarda ningun output pero `latest/` recibe el log para trazabilidad
+- `src/main.py` `_load_job_parts()`: carga `src/<job>/validate.py` de forma obligatoria; si el archivo no existe lanza `SystemExit(1)` con mensaje descriptivo indicando como crearlo
+- `src/main.py` `_run_consolidation()`: ejecuta `consolidator.validate()` si esta definida, entre `consolidate()` y `save_data()`; un fallo de validacion lanza `ValueError` que es capturado por `_run_series()` para actualizar `latest/` con solo el log
+- `src/main.py` `_run_series()`: el bloque de consolidacion se envuelve en try/except/finally para garantizar que `latest/` se actualice con el log incluso si la validacion del consolidador falla
+- `src/consolidadores/ejemplo.py`: marcador `# FIN ZONA DATA ENGINEER (2/2)` movido a antes del `return` (era codigo inalcanzable tras el return)
+
 ## [0.43.0] - 2026-03-25
 
 ### Added

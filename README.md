@@ -31,12 +31,14 @@ ScrapeCraft/
 │   │   ├── web_config.yaml            # URL, selectores y waits
 │   │   ├── scraper.py
 │   │   ├── process.py
+│   │   ├── validate.py                # Validaciones antes de guardar (gobierno de datos)
 │   │   └── utils.py
 │   └── books_to_scrape/               # Job: catalogo de libros (sitio de practica)
 │       ├── settings.py
 │       ├── web_config.yaml
 │       ├── scraper.py
 │       ├── process.py
+│       ├── validate.py                # Validaciones antes de guardar (gobierno de datos)
 │       └── utils.py
 ├── config/
 │   ├── global_settings.py             # Config global: LOG_CONFIG, DATA_CONFIG
@@ -100,8 +102,11 @@ main.py (Dispatcher CLI)
                                 │   ├── clear_latest()      # Limpia latest/<job>/ antes de cada run
                                 │   └── copy_to_latest()    # Copia output + log a latest/<job>/
                                 │
-                                └── process.py
-                                    └── process()       # Transforma raw → procesado
+                                ├── process.py
+                                │   └── process()       # Transforma raw → procesado
+                                │
+                                └── validate.py
+                                    └── validate()      # Valida antes de guardar (gobierno de datos)
 ```
 
 ### Modulos compartidos (`src/shared/`)
@@ -128,6 +133,7 @@ Cada consolidador define su propio `STORAGE_CONFIG` y una funcion `consolidate(j
 |--------|-----------------|
 | `scraper.py` | Logica de extraccion: navegar, manejar CAPTCHA, extraer elementos |
 | `process.py` | Transformacion de datos entre el raw y el guardado final |
+| `validate.py` | Validaciones de gobierno de datos antes de guardar; si falla, el output no se escribe |
 | `utils.py` | `parse_record()` con logica especifica del job; importa `safe_get_text`/`safe_get_attr` de shared |
 
 ## Requisitos previos
@@ -316,6 +322,8 @@ def consolidate(job_dataframes: dict[str, pd.DataFrame], params: dict = None) ->
 ```
 
 El framework se encarga de leer los archivos de cada job con la configuracion correcta de `DATA_CONFIG` y entrega los DataFrames listos. El data engineer solo escribe logica.
+
+Opcionalmente, el equipo de gobierno puede anadir una funcion `validate(df)` al consolidador siguiendo el mismo contrato que `src/<job>/validate.py`. Si esta presente, el framework la ejecuta despues de `consolidate()` y antes de guardar el output.
 
 ### Comportamiento ante fallos en serie
 
@@ -519,9 +527,13 @@ waits:
   after_load: 5
 ```
 
-## Zonas del data engineer
+## Zonas de trabajo
 
-Cada archivo marca con `# ZONA DATA ENGINEER` las secciones que debes modificar. El resto es codigo de framework y no requiere cambios.
+El proyecto define dos zonas de trabajo diferenciadas, cada una con sus archivos y responsabilidades.
+
+### Zona data engineer
+
+Archivos marcados con `# ZONA DATA ENGINEER`. El data engineer implementa la extraccion, transformacion y configuracion de cada job.
 
 | Archivo | Zona | Que implementar |
 |---------|------|-----------------|
@@ -534,7 +546,16 @@ Cada archivo marca con `# ZONA DATA ENGINEER` las secciones que debes modificar.
 | `config/pipelines/<nombre>.yaml` | Completo | Jobs, params, bloque `consolidate` |
 | `config/global_settings.py` | Completo (casos excepcionales) | Encoding, separadores, estructura XML, nivel de log |
 
-Lo que **no** toca el data engineer:
+### Zona gobierno de datos
+
+Archivos marcados con `# ZONA GOBIERNO DE DATOS`. El equipo de gobierno implementa las validaciones que deben cumplirse antes de que cualquier output sea persistido.
+
+| Archivo | Zona | Que implementar |
+|---------|------|-----------------|
+| `src/<job>/validate.py` | Cuerpo de `validate()` | Reglas de calidad, completitud, rangos, formatos esperados |
+| `src/consolidadores/<nombre>.py` `validate()` | Cuerpo de `validate()` | Validaciones especificas del dataset consolidado (opcional) |
+
+Lo que **ninguna** zona toca:
 - `src/main.py`
 - `src/shared/` (job_runner, storage, driver_config, logger, utils)
 
@@ -543,8 +564,9 @@ Lo que **no** toca el data engineer:
 1. Crear `src/<nombre>/scraper.py` con la logica de extraccion
 2. Crear `src/<nombre>/utils.py` con `parse_record()` (importa `safe_get_text`/`safe_get_attr` desde `src.shared.utils`)
 3. Crear `src/<nombre>/process.py` con la logica de transformacion
-4. Crear `src/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG` y `SKIP_PROCESS`
-5. Crear `src/<nombre>/web_config.yaml` con la URL y los selectores
+4. Crear `src/<nombre>/validate.py` con la funcion `validate()` — obligatorio; dejar la ZONA GOBIERNO DE DATOS vacia hasta que el equipo de gobierno la rellene
+5. Crear `src/<nombre>/settings.py` con `DRIVER_CONFIG`, `STORAGE_CONFIG`, `RAW_CONFIG` y `SKIP_PROCESS`
+6. Crear `src/<nombre>/web_config.yaml` con la URL y los selectores
 
 Las carpetas `output/<nombre>/` y `raw/<nombre>/` se crean automaticamente en la primera ejecucion. No es necesario modificar `main.py` ni ningun otro modulo del framework — el dispatcher descubre el job automaticamente por la presencia de `scraper.py`.
 
@@ -555,6 +577,57 @@ python -m src.main --job <nombre>
 ```
 
 No es necesario modificar `main.py`.
+
+## Validaciones (`src/<job>/validate.py`)
+
+Cada job requiere un archivo `validate.py` con la funcion `validate()`. El framework la llama despues de `process()` y antes de guardar cualquier output. Si la validacion falla, el job termina con error, no se escribe ningun archivo de output y `latest/` recibe unicamente el log para trazabilidad.
+
+```python
+def validate(df: pd.DataFrame) -> list[str]:
+    errors: list[str] = []
+
+    # =========================================================================
+    # ZONA GOBIERNO DE DATOS
+    # =========================================================================
+
+    # Ejemplo de validaciones:
+    # if len(df) < 10:
+    #     errors.append(f"Se esperaban al menos 10 registros, se obtuvieron {len(df)}")
+    # if df["Precio"].isna().any():
+    #     errors.append("Hay registros con Precio nulo")
+
+    # =========================================================================
+    # FIN ZONA GOBIERNO DE DATOS
+    # =========================================================================
+
+    return errors  # lista vacia = validacion exitosa
+```
+
+**Contrato:**
+- Recibe el DataFrame procesado por `process()` con los tipos ya asignados
+- Retorna `list[str]`: lista vacia = exito; lista con mensajes = fallo
+- Es de **solo lectura** — no debe modificar el DataFrame
+- No recibe `params`; si necesita contexto externo debe leerlo desde constantes o archivos de configuracion propios
+
+### Validacion en consolidadores
+
+La funcion `validate()` en un consolidador es **opcional**. Si esta definida, el framework la ejecuta despues de `consolidate()` y antes de guardar el output consolidado. El contrato es identico al de los jobs.
+
+```python
+# src/consolidadores/<nombre>.py
+def validate(df: pd.DataFrame) -> list[str]:
+    errors: list[str] = []
+    # ZONA GOBIERNO DE DATOS
+    return errors
+```
+
+### Comportamiento ante fallo de validacion
+
+| Escenario | Resultado |
+|-----------|-----------|
+| Job individual falla validacion | Error logueado, no se guarda output, `latest/<job>/` recibe solo el log |
+| Job en pipeline falla validacion | Mismo que fallo normal de job: pipeline continua, consolidacion omitida si hay fallos |
+| Consolidador falla validacion | Error logueado, no se guarda el consolidado, `latest/<pipeline>/` recibe solo logs de los jobs |
 
 ## Procesamiento (`src/<job>/process.py`)
 
@@ -592,18 +665,19 @@ def load_web_config(job_name: str) -> dict:
     """Carga y valida la configuracion de la web desde src/<job_name>/web_config.yaml.
     Lanza ValueError si faltan las claves requeridas (url, selectors, waits)."""
 
-def run(args, scrape_fn, process_fn, settings, job_name: str, params: dict | None = None, update_latest: bool = True) -> dict[str, Path]:
+def run(args, scrape_fn, process_fn, validate_fn, settings, job_name: str, params: dict | None = None, update_latest: bool = True) -> dict[str, Path]:
     """
     Punto de entrada generico para cualquier job. Llamado directamente desde main.py.
     params: dict nativo con los parametros definidos en el pipeline YAML (vacio si no se definio ninguno).
+    validate_fn: funcion validate() del job; se ejecuta despues de process() y antes de save_data().
     update_latest: si True (default) gestiona latest/<job>/ al inicio y al final de la ejecucion.
                    El orquestador de pipelines consolidados lo pasa como False para gestionar
                    su propio latest/<pipeline_name>/ centralizado.
     Retorna mapa de formato -> ruta del archivo guardado (ej: {"csv": Path(...), "json": Path(...)}).
 
-    Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → cleanup_raw → save_data → copy_to_latest
-    Sin proceso:       scrape → save_raw → normalize_in_memory → cleanup_raw → save_data → copy_to_latest
-    Flujo reprocess:   load_raw → process(df) → save_data → copy_to_latest
+    Flujo completo:    scrape → save_raw → normalize_in_memory → process(df) → validate(df) → cleanup_raw → save_data → copy_to_latest
+    Sin proceso:       scrape → save_raw → normalize_in_memory → validate(df) → cleanup_raw → save_data → copy_to_latest
+    Flujo reprocess:   load_raw → process(df) → validate(df) → save_data → copy_to_latest
     """
 ```
 
@@ -675,6 +749,18 @@ def scrape(driver, web_config, params: dict) -> list[dict]:
 ```python
 def process(df: pd.DataFrame) -> list[dict]:
     """Recibe un DataFrame con columnas en str y aplica transformaciones y castings de tipo."""
+```
+
+### `src/<job>/validate.py`
+
+```python
+def validate(df: pd.DataFrame) -> list[str]:
+    """
+    Valida el DataFrame procesado antes de guardarlo.
+    Recibe el DataFrame con los tipos asignados por process(). Es de solo lectura.
+    Retorna lista de mensajes de error; lista vacia significa validacion exitosa.
+    Si retorna errores, el job falla: no se guarda output ni se actualiza latest/ con datos.
+    """
 ```
 
 ### `src/<job>/utils.py`

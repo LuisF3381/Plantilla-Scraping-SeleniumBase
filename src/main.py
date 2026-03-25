@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import logging
+import pandas as pd
 import yaml
 from datetime import datetime
 from pathlib import Path
@@ -39,16 +40,26 @@ def get_available_jobs() -> list[str]:
 
 
 def _load_job_parts(job_name: str) -> tuple:
-    """Importa y retorna (scrape_fn, process_fn, settings) del job indicado."""
+    """Importa y retorna (scrape_fn, process_fn, validate_fn, settings) del job indicado."""
     try:
         scraper  = importlib.import_module(f"src.{job_name}.scraper")
         process  = importlib.import_module(f"src.{job_name}.process")
         settings = importlib.import_module(f"src.{job_name}.settings")
-        return scraper.scrape, process.process, settings
     except ModuleNotFoundError:
         available = ", ".join(get_available_jobs()) or "ninguno"
         logger.error(f"Job '{job_name}' no encontrado. Jobs disponibles: {available}")
         raise SystemExit(1)
+
+    try:
+        validate = importlib.import_module(f"src.{job_name}.validate")
+    except ModuleNotFoundError:
+        logger.error(
+            f"El job '{job_name}' no tiene validate.py. "
+            f"Crea src/{job_name}/validate.py con la funcion validate(df: pd.DataFrame) -> list[str]."
+        )
+        raise SystemExit(1)
+
+    return scraper.scrape, process.process, validate.validate, settings
 
 
 def _make_args(job_name: str) -> argparse.Namespace:
@@ -138,6 +149,16 @@ def _run_consolidation(job_outputs: dict[str, Path], consolidate_config: dict) -
         logger.warning("El consolidador no retorno datos.")
         return {}
 
+    if hasattr(consolidator, "validate"):
+        logger.info("Ejecutando validaciones del consolidador...")
+        errors = consolidator.validate(pd.DataFrame(result))
+        if errors:
+            errors_str = "\n  - ".join(errors)
+            raise ValueError(
+                f"Validacion del consolidador fallida ({len(errors)} error(es)):\n  - {errors_str}"
+            )
+        logger.info("Validacion del consolidador exitosa")
+
     now = datetime.now()
     storage_config = consolidator.STORAGE_CONFIG
     output_formats = storage_config.get("output_formats", ["csv"])
@@ -189,9 +210,9 @@ def _run_series(job_entries: list[dict], consolidate_config: dict | None = None,
         logger.info(f"\n[{i}/{total}] Iniciando job: {job_name}")
 
         try:
-            scrape_fn, process_fn, settings = _load_job_parts(job_name)
+            scrape_fn, process_fn, validate_fn, settings = _load_job_parts(job_name)
             output_paths = job_runner.run(
-                _make_args(job_name), scrape_fn, process_fn, settings, job_name,
+                _make_args(job_name), scrape_fn, process_fn, validate_fn, settings, job_name,
                 params=params,
                 update_latest=not is_consolidated,
             )
@@ -221,11 +242,18 @@ def _run_series(job_entries: list[dict], consolidate_config: dict | None = None,
             )
             merge_logs_to_latest(pipeline_folder, collected_logs)
         else:
-            consolidation_paths = _run_consolidation(job_outputs, consolidate_config)
             consolidator = importlib.import_module(f"src.consolidadores.{consolidate_config['module']}")
             base_filename = consolidator.STORAGE_CONFIG.get("filename")
-            copy_to_latest(pipeline_folder, consolidation_paths, None, base_filename)
-            merge_logs_to_latest(pipeline_folder, collected_logs)
+            consolidation_paths: dict[str, Path] = {}
+            try:
+                consolidation_paths = _run_consolidation(job_outputs, consolidate_config)
+            except SystemExit:
+                raise
+            except Exception as e:
+                logger.error(f"ERROR en consolidacion: {e}")
+            finally:
+                copy_to_latest(pipeline_folder, consolidation_paths, None, base_filename)
+                merge_logs_to_latest(pipeline_folder, collected_logs)
 
 
 # ---------------------------------------------------------------------------
@@ -343,8 +371,8 @@ def main() -> None:
     # --- Despacho segun modo ---
 
     if args.job:
-        scrape_fn, process_fn, settings = _load_job_parts(args.job)
-        job_runner.run(args, scrape_fn, process_fn, settings, args.job)
+        scrape_fn, process_fn, validate_fn, settings = _load_job_parts(args.job)
+        job_runner.run(args, scrape_fn, process_fn, validate_fn, settings, args.job)
 
     elif args.pipeline:
         entries, consolidate_config, pipeline_name = _load_pipeline(args.pipeline)
